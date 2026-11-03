@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isAllowedEmail } from '@/lib/emailPolicy';
+import { classifySetPasswordError, classifySignInError, type SetPasswordFailure, type SignInFailure } from '@/lib/password';
 import { OTP_MAX_ATTEMPTS, VerificationError, type EmployeeVerifier, type RequestFailure } from '@/lib/verification';
 import { supabase } from './supabaseClient';
 
@@ -53,15 +54,30 @@ export const verifier: EmployeeVerifier = supabase ? createEmailVerifier(supabas
 
 export const verifiedLabel = () => 'Verified email';
 
-/**
- * Test-only sign-in with a password, for dummy accounts you create in the Supabase dashboard
- * (Authentication > Users > Add user, with "Auto Confirm User" ticked), so no email is needed.
- * Off unless EXPO_PUBLIC_DEV_LOGIN=true is in .env. Leave it off for anything real.
- */
-export const devLoginEnabled = !!supabase && process.env.EXPO_PUBLIC_DEV_LOGIN === 'true';
+export type PasswordSignInResult = { ok: true } | { ok: false; reason: SignInFailure };
+export type SetPasswordResult = { ok: true } | { ok: false; reason: SetPasswordFailure };
 
-export async function signInWithPassword(email: string, password: string): Promise<boolean> {
-  if (!supabase || !devLoginEnabled) return false;
-  const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
-  return !error;
+/** Sign in with a Login ID (work email) and password: how provisioned employees and the developer accounts get in. */
+export async function signInWithPassword(email: string, password: string): Promise<PasswordSignInResult> {
+  if (!supabase) return { ok: false, reason: 'failed' };
+  try {
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+    return error ? { ok: false, reason: classifySignInError(error) } : { ok: true };
+  } catch {
+    return { ok: false, reason: 'offline' };
+  }
+}
+
+/**
+ * Sets the signed-in person's own password and clears the "must change password" flag that new accounts start with.
+ * The flag lives in the account's user metadata; it only ever affects the person's own sign-in screen.
+ */
+export async function setPassword(password: string): Promise<SetPasswordResult> {
+  if (!supabase) return { ok: false, reason: 'failed' };
+  try {
+    const { error } = await supabase.auth.updateUser({ password, data: { must_change_password: false } });
+    return error ? { ok: false, reason: classifySetPasswordError(error) } : { ok: true };
+  } catch {
+    return { ok: false, reason: 'offline' };
+  }
 }

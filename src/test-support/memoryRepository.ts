@@ -1,13 +1,14 @@
 import { newId } from '@/lib/id';
 import { TOPIC_CATALOGUE } from '@/lib/topics';
-import { DEFAULT_NOTIFICATION_PREFS, authorSnapshot } from './shared';
-import type { Repository } from './repository';
+import { usernameProblem } from '@/lib/username';
+import { DEFAULT_NOTIFICATION_PREFS, authorSnapshot } from '@/data/shared';
+import type { Repository } from '@/data/repository';
 import type {
   AppNotification, Bookmark, BookmarkType, ChatFlag, ChatMessage, Comment, Community, CommunityStat, Conversation, DownvoteReason,
   FeedbackCategory, FeedbackRow, Mood, MoodCheckin, MoodTag, NewPostInput, NewProfileInput, NotificationPrefs, OrgPulse, PersonMatch,
   PollState, Post, PostKind, PostMeta, Profile, ProfilePatch, ReceivedFeedback, ReceivedShoutout, Resource, ShoutoutBadge, Topic,
   Vote, VoteTarget, VoteValue, WallShoutout, WellnessKind, WellnessSession,
-} from './types';
+} from '@/data/types';
 
 const unsupported = () => { throw new Error('Not available in the in-memory repository'); };
 
@@ -37,6 +38,7 @@ export class MemoryRepository implements Repository {
     this.profile = {
       id: newId(), displayName: input.displayName.trim() || 'there', lockEnabled: input.lockEnabled, onboardingComplete: false,
       createdAt: Date.now(), role: input.role, experience: input.experience, verified: true, discoverable: false,
+      username: input.username?.trim() || null, interests: input.interests ?? [],
     };
     return this.profile;
   }
@@ -178,6 +180,7 @@ export class MemoryRepository implements Repository {
   }
   async listSessions() { return [...this.sessions]; }
 
+  async isUsernameAvailable(name: string) { return usernameProblem(name) === null; }
   async discoverPeople(): Promise<PersonMatch[]> { return []; }
   async requestChat(_code: string, _intro: string, _showRole: boolean): Promise<string> { return unsupported(); }
   async listConversations(): Promise<Conversation[]> { return []; }

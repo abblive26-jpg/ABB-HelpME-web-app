@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View, type TextInputInstance } from 'react-native';
 import { Capy } from '@/components/Capy';
 import { Button, Text } from '@/components/ui';
-import { accents, colors, radius, space } from '@/constants/brand';
+import { accents, colors, radius, space, themed } from '@/constants/brand';
 import { verifier } from '@/data/auth';
 import { OTP_LENGTH, REQUEST_FAILURE_TEXT, VerificationError, type OtpChallenge, type OtpResult } from '@/lib/verification';
 
@@ -109,7 +109,7 @@ export function OtpStep({ email, challenge, createUser = true, onChallenge, onVe
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   boxes: { flexDirection: 'row', justifyContent: 'center', gap: space.sm },
   box: { width: 46, height: 56, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface,
     alignItems: 'center', justifyContent: 'center' },
@@ -117,4 +117,4 @@ const styles = StyleSheet.create({
   boxError: { borderColor: colors.red },
   digit: { fontSize: 24, fontWeight: '800', color: colors.navy },
   hidden: { position: 'absolute', opacity: 0, width: '100%', height: '100%' },
-});
+}));

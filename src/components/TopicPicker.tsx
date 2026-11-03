@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { IconTile, Text, type IconName } from '@/components/ui';
-import { accents, colors, radius, space, type Accent } from '@/constants/brand';
+import { type Accent, accents, colors, radius, space, themed } from '@/constants/brand';
 import { MIN_TOPIC_COUNT, TOPIC_CATALOGUE, toggleTopic } from '@/lib/topics';
 
 const TOPIC_STYLE: Record<(typeof TOPIC_CATALOGUE)[number]['id'], { icon: IconName; accent: Accent }> = {
@@ -54,12 +54,12 @@ export function TopicProgress({ count }: { count: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: space.sm + 2 },
   tile: { width: '48.5%', minHeight: 112, padding: space.md, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.border,
     backgroundColor: colors.surface, gap: space.sm },
-  tileOn: { borderColor: colors.red, backgroundColor: '#FFF7F8' },
+  tileOn: { borderColor: colors.red, backgroundColor: colors.selected },
   tileTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   track: { height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' },
   fill: { height: 6, borderRadius: 3 },
-});
+}));

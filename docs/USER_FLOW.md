@@ -3,7 +3,7 @@
 Journey: **Connect → Ask → Share → Recharge → Improve**.
 
 ## 1. Entry
-Launch → no session → **Welcome** → Get started / Log in → email → 6-digit code → (new account) profile: name, role, experience, device lock → **choose support categories (at least one of seven)** → Home.
+Launch → no session → **Welcome** → **Log in** (Login ID = work email, + password) → **first sign-in only: choose your own password** → profile: name, role, experience, device lock → **choose support categories (at least one of seven)** → Home. Registering yourself instead: Create an account → email → 6-digit code → the same profile and category steps. Forgot your password: "Email me a sign-in code" (then My Profile > Change password), or ask an administrator to reset it in the admin console.
 Returning with a session: Welcome → Unlock (Face ID / fingerprint if the profile asks) → Home. Session expiry or sign-out returns to Welcome.
 
 ## 2. Navigation
@@ -15,7 +15,8 @@ Bottom tabs: **Home | Community | (Ask Cappy) | Resources | Well-being**.
 ## 3. Screens
 | Route | Purpose |
 | --- | --- |
-| `/welcome`, `/onboarding/topics` | sign-in, profile, seven categories |
+| `/welcome`, `/onboarding/topics` | sign-in (password or emailed code), first-sign-in password, profile, seven categories |
+| `/change-password` | choose a new password (My Profile > Account) |
 | `/(tabs)/community` | feed: For you / All / Personal / Work / HR-IT / Discussions & ideas / Polls / Achievements |
 | `/compose` | question, discussion, idea, poll (2 to 6 options), achievement, personal support; community; up to 4 photos |
 | `/post/[id]` | post, photos, poll, answers, votes, accept, save, report |

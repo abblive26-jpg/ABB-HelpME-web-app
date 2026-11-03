@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui';
-import { accents, colors, space } from '@/constants/brand';
+import { accents, colors, space, themed } from '@/constants/brand';
 import { MoodIcon } from '@/components/MoodIcon';
 import { MOOD_LABEL, type DayPoint } from '@/lib/moodStats';
 
 const PLOT_H = 112;
 const LEVELS = 4; // struggling(1) … great(4)
-const BAR = accents.blue.fg; // single series → single hue, no legend; the axis icons carry meaning
+// single series → single hue (accents.blue.fg), no legend; the axis icons carry meaning
 
 const dayName = (t: number, style: 'narrow' | 'short') =>
   new Date(t).toLocaleDateString(undefined, style === 'narrow' ? { weekday: 'narrow' } : { weekday: 'short', day: 'numeric', month: 'short' });
@@ -94,11 +94,11 @@ function TableToggle({ table, onToggle }: { table: boolean; onToggle: () => void
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   plot: { flexDirection: 'row', alignItems: 'flex-end', borderBottomWidth: 1, borderBottomColor: colors.border },
   grid: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   hit: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'flex-end' },
-  bar: { backgroundColor: BAR, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
+  bar: { backgroundColor: accents.blue.fg, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
   empty: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: 2 },
   tableRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-});
+}));

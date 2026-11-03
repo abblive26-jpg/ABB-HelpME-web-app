@@ -12,7 +12,11 @@ const db = new PGlite();
 const stub = `
 create role anon nologin; create role authenticated nologin;
 create schema auth;
-create table auth.users (id uuid primary key default gen_random_uuid(), email text, banned_until timestamptz, last_sign_in_at timestamptz, created_at timestamptz default now());
+create table auth.users (id uuid primary key default gen_random_uuid(), email text, banned_until timestamptz, last_sign_in_at timestamptz, created_at timestamptz default now(), encrypted_password text, raw_user_meta_data jsonb, updated_at timestamptz);
+create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid);
+create schema extensions;
+create function extensions.gen_salt(t text) returns text language sql as $$ select 'salt' $$;
+create function extensions.crypt(pw text, salt text) returns text language sql as $$ select 'hash:' || pw $$;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
 create schema storage;
@@ -294,6 +298,21 @@ await asAdmin(async () => {
   await expectFail('admin cannot delete a staff account', () => q(`select public.admin_delete_user($1, 'x')`, [viewerId]));
   await q(`select public.admin_delete_user($1, 'test')`, [users.erin]);
 });
+// password reset by an admin
+await q(`update auth.users set encrypted_password = 'hash:old', raw_user_meta_data = '{"must_change_password": false}' where id = $1`, [users.carol]);
+await q(`insert into auth.sessions (user_id) values ($1)`, [users.carol]);
+await as('carol', () => expectFail('member cannot reset passwords', () => q(`select public.admin_reset_password($1, 'Newpass2026x', 'x')`, [users.bob])));
+await asViewer(() => expectFail('viewer cannot reset passwords', () => q(`select public.admin_reset_password($1, 'Newpass2026x', 'x')`, [users.carol])));
+await asAdmin(async () => {
+  await expectFail('admin cannot reset a staff password here', () => q(`select public.admin_reset_password($1, 'Newpass2026x', 'x')`, [viewerId]));
+  await expectFail('too-short password is refused', () => q(`select public.admin_reset_password($1, 'short', 'x')`, [users.carol]));
+  await q(`select public.admin_reset_password($1, 'Newpass2026x', 'forgot it')`, [users.carol]);
+});
+const reset = (await q('select encrypted_password, raw_user_meta_data from auth.users where id = $1', [users.carol])).rows[0];
+check('admin reset stores the new hash and flags a forced change', reset.encrypted_password === 'hash:Newpass2026x' && reset.raw_user_meta_data.must_change_password === true);
+check('admin reset signs the person out everywhere', (await q('select count(*)::int n from auth.sessions where user_id = $1', [users.carol])).rows[0].n === 0);
+const resetAudit = (await q(`select detail::text d from public.admin_audit where action = 'reset_password'`)).rows;
+check('reset is audited without the password', resetAudit.length === 1 && !resetAudit[0].d.includes('Newpass2026x'));
 check('admin edits a profile', (await q('select role from profiles where id = $1', [users.bob])).rows[0].role === 'manager');
 check('admin deletes a post', Array.isArray(files) && (await q('select count(*)::int n from posts where id = $1', [discussionId])).rows[0].n === 0);
 check('admin deletes a user', (await q('select count(*)::int n from auth.users where id = $1', [users.erin])).rows[0].n === 0);
@@ -323,6 +342,52 @@ await asViewer(async () => {
 await as('bob', () => expectFail('member cannot read mood by role', () => q('select * from public.admin_mood_roles(30)')));
 await as('bob', () => expectFail('member cannot read daily mood', () => q(`select * from public.admin_mood_daily(30, '')`)));
 await asAnon(() => expectFail('anon cannot read the heatmap', () => q('select * from public.admin_mood_matrix(8)')));
+
+// ---- usernames and interests
+await as('bob', async () => {
+  await q(`update profiles set username = 'CalmMaple42', interests = array['music','running'] where id = $1`, [users.bob]);
+  check('a member can set a username and interests', (await q('select username from profiles where id = $1', [users.bob])).rows[0].username === 'CalmMaple42');
+  check('own username counts as available to oneself', (await q(`select username_available('CalmMaple42') a`)).rows[0].a === true);
+});
+await as('carol', async () => {
+  check('a taken username is not available (any case)', (await q(`select username_available('calmmaple42') a`)).rows[0].a === false);
+  check('a free username is available', (await q(`select username_available('QuietRiver7') a`)).rows[0].a === true);
+  check('bad formats are not available', (await q(`select username_available('ab') a`)).rows[0].a === false && (await q(`select username_available('has space') a`)).rows[0].a === false);
+  check('reserved names are not available', (await q(`select username_available('SupportTeam') a`)).rows[0].a === false && (await q(`select username_available('abb') a`)).rows[0].a === false);
+  await expectFail('two accounts cannot share a username', () => q(`update profiles set username = 'CALMMAPLE42' where id = $1`, [users.carol]));
+  await expectFail('reserved username is refused on save', () => q(`update profiles set username = 'AdminTeam' where id = $1`, [users.carol]));
+  await expectFail('badly formatted username is refused on save', () => q(`update profiles set username = 'no spaces!' where id = $1`, [users.carol]));
+  await expectFail('more than 8 interests is refused', () => q(`update profiles set interests = array['a','b','c','d','e','f','g','h','i'] where id = $1`, [users.carol]));
+  await q(`update profiles set username = 'QuietRiver7', interests = array['music','travel'] where id = $1`, [users.carol]);
+});
+await asAnon(() => expectFail('anon cannot check usernames', () => q(`select username_available('Anything1')`)));
+let uPost;
+await as('bob', async () => {
+  uPost = (await q(`insert into posts (kind, category, title, body, show_author, author_role) values ('discussion','Work','Shown handle','body text here', true, 'engineer') returning id`)).rows[0].id;
+  await q(`insert into posts (kind, category, title, body, show_author) values ('discussion','Work','Hidden handle','body text here', false)`);
+});
+await as('carol', async () => {
+  const shown = (await q(`select author_username from posts_feed where title = 'Shown handle'`)).rows[0];
+  const hidden = (await q(`select author_username from posts_feed where title = 'Hidden handle'`)).rows[0];
+  check('a post that shows its author carries the username', shown.author_username === 'CalmMaple42');
+  check('a post that hides its author carries no username', hidden.author_username === null);
+  await q(`insert into comments (post_id, body, show_author) values ($1, 'a shown answer', true)`, [uPost]);
+  await q(`insert into comments (post_id, body, show_author) values ($1, 'a hidden answer', false)`, [uPost]);
+  const cs = (await q(`select body, author_username from comments_feed where post_id = $1 order by body`, [uPost])).rows;
+  check('answers follow the same rule', cs.find((c) => c.body === 'a shown answer').author_username === 'QuietRiver7' && cs.find((c) => c.body === 'a hidden answer').author_username === null);
+});
+await mkUser('gina', 'gina@outlook.com');
+await as('gina', async () => {
+  await q(`insert into profiles (display_name, role, experience, topics, onboarding_complete, discoverable, interests) values ('Gina', 'hr', '1to3', array['mental'], true, true, array['music'])`);
+  const d = (await q('select * from discover_people(10)')).rows;
+  check('discovery uses the username as the handle and lists interests', d.some((r) => r.alias === 'QuietRiver7' && r.interests.includes('music') && r.shared_interests === 1));
+  check('discovery still exposes no account ids', d.length > 0 && !('id' in d[0]) && !('user_id' in d[0]));
+});
+await as('bob', async () => {
+  // the client cannot spoof a username on a post
+  const spoof = (await q(`insert into posts (kind, category, title, body, show_author, author_username) values ('discussion','Work','Spoof try','body text here', true, 'SomeoneElse') returning author_username`)).rows[0];
+  check('a spoofed username is replaced by the real one', spoof.author_username === 'CalmMaple42');
+});
 
 // delete account cascades
 await as('alice', () => q('select delete_my_data()'));

@@ -78,6 +78,7 @@ export interface Repository {
   listSessions(): Promise<WellnessSession[]>;
 
   // People who understand / 1-to-1 chat
+  isUsernameAvailable(name: string): Promise<boolean>;
   discoverPeople(): Promise<PersonMatch[]>;
   requestChat(code: string, intro: string, showRole: boolean): Promise<string>;
   listConversations(): Promise<Conversation[]>;

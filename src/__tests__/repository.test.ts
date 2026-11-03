@@ -1,4 +1,4 @@
-import { MemoryRepository } from '@/data/memoryRepository';
+import { MemoryRepository } from '@/test-support/memoryRepository';
 import { computeRecap, monthRange } from '@/lib/recap';
 import { validatePostInput } from '@/data/shared';
 
@@ -99,12 +99,12 @@ describe('delete account', () => {
 });
 
 describe('author snapshot', () => {
-  it('attaches role/experience only when the author opts in, and never a name', async () => {
+  it('attaches role/experience only when the author opts in, and never a name, only the chosen username', async () => {
     const repo = new MemoryRepository();
-    await repo.createProfile({ displayName: 'Asha', lockEnabled: false, role: 'engineer', experience: '3to5' });
+    await repo.createProfile({ displayName: 'Asha', lockEnabled: false, role: 'engineer', experience: '3to5', username: 'CalmMaple42', interests: ['music'] });
     const shown = await repo.createPost({ kind: 'work_question', category: 'IT', title: 'Q one', body: 'details here', showAuthor: true });
     const hidden = await repo.createPost({ kind: 'personal', category: 'x', title: '', body: 'note' });
-    expect(shown.author).toEqual({ role: 'engineer', experience: '3to5', verified: true });
+    expect(shown.author).toEqual({ role: 'engineer', experience: '3to5', verified: true, username: 'CalmMaple42' });
     expect(JSON.stringify(shown.author)).not.toContain('Asha');
     expect(hidden.author).toBeNull();
   });

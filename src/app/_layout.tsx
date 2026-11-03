@@ -2,7 +2,9 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from '@/state/AppProvider';
+import { ThemeProvider, useTheme } from '@/state/ThemeProvider';
 import { Button, EmptyState, Loading, Screen } from '@/components/ui';
+import { colors } from '@/constants/brand';
 
 /**
  * Navigation follows auth state. Signed out, locked, or mid-registration → welcome.
@@ -11,6 +13,7 @@ import { Button, EmptyState, Loading, Screen } from '@/components/ui';
  */
 function Gate() {
   const { status, error, retry, profile, unlocked } = useApp();
+  const { scheme } = useTheme();
   if (status === 'loading') return <Screen scroll={false}><Loading label="Getting things ready…" /></Screen>;
   if (status === 'unconfigured') {
     return (
@@ -30,7 +33,8 @@ function Gate() {
   }
   const onboarded = !!profile?.onboardingComplete;
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FAF8F6' } }}>
+    // Keyed on the theme: switching light/dark remounts every screen so each one picks up the new palette.
+    <Stack key={scheme} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       {/* Not signed in or locked: welcome (email code sign-in, profile setup, unlock) */}
       <Stack.Protected guard={!unlocked}>
         <Stack.Screen name="welcome" />
@@ -57,6 +61,7 @@ function Gate() {
         <Stack.Screen name="topics" />
         <Stack.Screen name="privacy" />
         <Stack.Screen name="more" />
+        <Stack.Screen name="change-password" />
         <Stack.Screen name="help" />
         <Stack.Screen name="communities/index" />
         <Stack.Screen name="communities/[id]" />
@@ -74,13 +79,20 @@ function Gate() {
   );
 }
 
+function ThemedStatusBar() {
+  const { scheme } = useTheme();
+  return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
+}
+
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <AppProvider>
-        <Gate />
-      </AppProvider>
+      <ThemeProvider>
+        <ThemedStatusBar />
+        <AppProvider>
+          <Gate />
+        </AppProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

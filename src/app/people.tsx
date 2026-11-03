@@ -6,7 +6,7 @@ import { colors, space } from '@/constants/brand';
 import type { PersonMatch } from '@/data/types';
 import { attempt } from '@/lib/attempt';
 import { confirmContent } from '@/lib/confirmContent';
-import { experienceLabel, roleLabel } from '@/lib/profileOptions';
+import { experienceLabel, interestLabel, roleLabel } from '@/lib/profileOptions';
 import { useApp } from '@/state/AppProvider';
 import { useData } from '@/state/useData';
 
@@ -68,10 +68,11 @@ export default function People() {
             <View style={{ flex: 1 }}>
               <Text variant="h3">{p.alias}</Text>
               <Text variant="small">{meta(p)}</Text>
+              {p.interests.length ? <Text variant="small" numberOfLines={2}>{p.interests.map(interestLabel).join(' · ')}</Text> : null}
               <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
                 {p.role && p.role === profile?.role ? <Badge label="Same role" tone="ok" /> : null}
                 {p.experience && p.experience === profile?.experience ? <Badge label="Similar experience" tone="ok" /> : null}
-                {p.sharedTopics ? <Badge label={`${p.sharedTopics} shared ${p.sharedTopics === 1 ? 'interest' : 'interests'}`} tone="neutral" /> : null}
+                {p.sharedTopics + p.sharedInterests ? <Badge label={`${p.sharedTopics + p.sharedInterests} shared ${p.sharedTopics + p.sharedInterests === 1 ? 'interest' : 'interests'}`} tone="neutral" /> : null}
               </View>
             </View>
           </View>

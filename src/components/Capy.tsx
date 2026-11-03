@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import Animated, {
   Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withSequence, withSpring, withTiming,
 } from 'react-native-reanimated';
-import { colors, radius, shadow, space } from '@/constants/brand';
+import { colors, radius, shadow, space, themed } from '@/constants/brand';
 import type { CapyPoseName } from '@/lib/capy';
 
 /**
@@ -120,7 +120,7 @@ export function CapyAvatar({ size = 40, pose = 'happy', ring = colors.red }: { s
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   bubble: { padding: space.md, borderRadius: radius.xl, ...shadow },
   message: { fontSize: 15, lineHeight: 21, fontWeight: '600', color: colors.navy },
@@ -128,4 +128,4 @@ const styles = StyleSheet.create({
   tailLeft: { left: -6, top: '50%', marginTop: -7 },
   tailRight: { right: -6, top: '50%', marginTop: -7 },
   tailTop: { top: -6, left: '50%', marginLeft: -7 },
-});
+}));

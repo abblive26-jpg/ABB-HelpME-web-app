@@ -8,19 +8,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import { Capy, type CapyPose } from '@/components/Capy';
-import { MIN_TOUCH, accents, colors, radius, shadow, space, type Accent } from '@/constants/brand';
+import { type Accent, accents, colors, MIN_TOUCH, radius, shadow, space, themed } from '@/constants/brand';
 
 export type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /* ---------- Text ---------- */
-const textStyles = StyleSheet.create({
+const textStyles = themed(() => StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', color: colors.navy, lineHeight: 32, letterSpacing: -0.3 },
   h2: { fontSize: 18, fontWeight: '700', color: colors.navy, lineHeight: 24, letterSpacing: -0.2 },
   h3: { fontSize: 15, fontWeight: '600', color: colors.navy, lineHeight: 21 },
   body: { fontSize: 15, color: colors.navy2, lineHeight: 22 },
   small: { fontSize: 13, color: colors.muted, lineHeight: 18 },
   label: { fontSize: 12, fontWeight: '600', color: colors.muted, lineHeight: 16 },
-});
+}));
 export function Text({ variant = 'body', style, ...p }: React.ComponentProps<typeof RNText> & { variant?: keyof typeof textStyles }) {
   return <RNText {...p} style={[textStyles[variant], style]} />;
 }
@@ -83,12 +83,12 @@ export function Button({ label, onPress, variant = 'primary', icon, disabled, lo
     </Pressable>
   );
 }
-const btnVariants: Record<BtnVariant, { box: ViewStyle; color: string }> = {
+const btnVariants: Record<BtnVariant, { box: ViewStyle; color: string }> = themed(() => ({
   primary: { box: { backgroundColor: colors.red }, color: '#fff' },
   secondary: { box: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.red }, color: colors.red },
   ghost: { box: { backgroundColor: 'transparent' }, color: colors.navy },
-  danger: { box: { backgroundColor: colors.redTint, borderWidth: 1, borderColor: '#F5B8C2' }, color: colors.redDark },
-};
+  danger: { box: { backgroundColor: colors.redTint, borderWidth: 1, borderColor: colors.redLine }, color: colors.redDark },
+}));
 
 export function IconButton({ icon, label, onPress, color = colors.navy, active }: {
   icon: IconName; label: string; onPress: () => void; color?: string; active?: boolean;
@@ -129,13 +129,13 @@ export function Chip({ label, selected, onPress, disabled }: { label: string; se
 }
 
 type BadgeTone = 'sample' | 'local' | 'neutral' | 'warn' | 'ok';
-const badgeTones: Record<BadgeTone, { bg: string; fg: string; icon: IconName }> = {
-  sample: { bg: colors.orange, fg: '#8A5300', icon: 'flask-outline' },
-  local: { bg: colors.teal, fg: '#0B5E5A', icon: 'people-outline' },
-  neutral: { bg: colors.sand, fg: colors.navy2, icon: 'ellipse-outline' },
-  warn: { bg: colors.orange, fg: '#8A5300', icon: 'alert-circle-outline' },
-  ok: { bg: colors.green, fg: '#0F6B43', icon: 'checkmark-circle-outline' },
-};
+const badgeTones: Record<BadgeTone, { bg: string; fg: string; icon: IconName }> = themed(() => ({
+  sample: { bg: colors.orange, fg: colors.onOrange, icon: 'flask-outline' as const },
+  local: { bg: colors.teal, fg: colors.onTeal, icon: 'people-outline' as const },
+  neutral: { bg: colors.sand, fg: colors.navy2, icon: 'ellipse-outline' as const },
+  warn: { bg: colors.orange, fg: colors.onOrange, icon: 'alert-circle-outline' as const },
+  ok: { bg: colors.green, fg: colors.onGreen, icon: 'checkmark-circle-outline' as const },
+}));
 export function Badge({ label, tone = 'neutral' }: { label: string; tone?: BadgeTone }) {
   const t = badgeTones[tone];
   return (
@@ -251,7 +251,7 @@ export function BrandMark({ light, height = 24 }: { light?: boolean; height?: nu
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   screenPad: { padding: space.lg, paddingBottom: space.xxl * 2 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
   backBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface,
     borderWidth: 1, borderColor: colors.border },
   btn: { minHeight: MIN_TOUCH, borderRadius: radius.md, paddingHorizontal: space.xl, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
-  card: { backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: '#EEF0F5', padding: space.lg, ...shadow },
+  card: { backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, padding: space.lg, ...shadow },
   chip: { minHeight: 40, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   chipOn: { borderColor: colors.red, backgroundColor: colors.redTint },
@@ -270,5 +270,5 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center', padding: space.xxl },
   row: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, paddingHorizontal: space.md,
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface },
-  rowGroup: { borderRadius: radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: '#EEF0F5', backgroundColor: colors.surface, ...shadow },
-});
+  rowGroup: { borderRadius: radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, ...shadow },
+}));

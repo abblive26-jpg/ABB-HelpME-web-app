@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Capy, CapyAvatar } from '@/components/Capy';
 import { Badge, Button, IconTile, Text } from '@/components/ui';
-import { accents, colors, radius, shadow, space } from '@/constants/brand';
+import { accents, colors, radius, shadow, space, themed } from '@/constants/brand';
 import type { Resource } from '@/data/types';
 import { STARTER_PROMPTS, localAssistant, type AssistantReply } from '@/lib/assistant';
 import { newId } from '@/lib/id';
@@ -171,7 +171,7 @@ function Bubble({ msg, byId }: { msg: Msg; byId: Map<string, Resource> }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.md,
     backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
   closeBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.sand },
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   bubble: { maxWidth: '85%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
   me: { backgroundColor: colors.red, borderBottomRightRadius: 6 },
   bot: { backgroundColor: colors.surface, borderBottomLeftRadius: 6, borderWidth: 1, borderColor: colors.border },
-  urgent: { backgroundColor: colors.redTint, borderColor: '#F5B8C2' },
+  urgent: { backgroundColor: colors.redTint, borderColor: colors.redLine },
   resCard: { width: '85%', flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.lg,
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   link: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: space.xs },
@@ -191,4 +191,4 @@ const styles = StyleSheet.create({
   input: { flex: 1, minHeight: 48, maxHeight: 120, borderRadius: 24, paddingHorizontal: space.lg, paddingTop: 13, paddingBottom: 13,
     backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, fontSize: 16, color: colors.navy },
   sendBtn: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.red, ...shadow },
-});
+}));

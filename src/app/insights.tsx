@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { Card, Header, IconButton, IconTile, Loading, Notice, Screen, Text, type IconName } from '@/components/ui';
-import { colors, space, type Accent } from '@/constants/brand';
+import { type Accent, accents, colors, space } from '@/constants/brand';
 import { MoodIcon } from '@/components/MoodIcon';
 import { MOOD_LABEL, TAG_LABEL } from '@/lib/moodStats';
 import { moodShares } from '@/lib/pulse';
@@ -9,7 +9,7 @@ import { computeRecap } from '@/lib/recap';
 import { monthLabel } from '@/lib/time';
 import { useData } from '@/state/useData';
 
-const BAR_COLORS = [colors.red, '#3B82F6', '#1E8E5A', '#F59E0B', '#8B5CF6'];
+const barColors = () => [colors.red, accents.blue.fg, accents.green.fg, accents.amber.fg, accents.violet.fg];
 
 export default function Insights() {
   const now = new Date();
@@ -99,7 +99,7 @@ export default function Insights() {
                 <Text variant="small" style={{ color: colors.navy, fontWeight: '700' }}>{s.count}</Text>
               </View>
               <View style={{ height: 8, borderRadius: 4, backgroundColor: colors.sand, marginTop: 4 }}>
-                <View style={{ height: 8, borderRadius: 4, width: `${(s.count / max) * 100}%`, backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }} />
+                <View style={{ height: 8, borderRadius: 4, width: `${(s.count / max) * 100}%`, backgroundColor: barColors()[i % 5] }} />
               </View>
             </View>
           ))}

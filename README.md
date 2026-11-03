@@ -33,7 +33,7 @@ Only Outlook / Hotmail / Live / MSN and `abb.com` addresses (`src/lib/emailPolic
 
 | Area | What it does |
 | --- | --- |
-| Sign-in | Emailed 6-digit code, no password. Profile (role, experience) saved with the account. Optional device lock (Face ID / fingerprint). |
+| Sign-in | Login ID (work email) + password. Accounts are issued with a starting password and the person must choose their own at first sign-in, then sees the same profile and topic steps as a new registration. "Change password" lives in My Profile. Emailed 6-digit code remains for registering and as a fallback. Optional device lock (Face ID / fingerprint). |
 | 7-category onboarding | Mental wellbeing, Workplace concerns, Relationships and communication, Career growth, Team and collaboration, Personal wellbeing, Workplace questions. Drives the **For you** feed, resource suggestions and people matching. |
 | Home | Cappy check-in, quick actions, unread messages and notifications, suggested resources, trending questions, shortcuts to every feature. |
 | Community | Questions, discussions, ideas, polls, achievements, personal support posts, photos. Voting (downvotes need a reason), accepted answers, reports, search, For you / newest / most helpful. |

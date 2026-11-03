@@ -3,7 +3,7 @@ import { Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Capy } from '@/components/Capy';
 import { Text } from '@/components/ui';
-import { colors } from '@/constants/brand';
+import { colors, shadow, themed } from '@/constants/brand';
 
 type Name = React.ComponentProps<typeof Ionicons>['name'];
 const tab = (title: string, on: Name, off: Name) => ({
@@ -45,13 +45,13 @@ export default function TabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   bar: {
     backgroundColor: colors.surface, borderTopWidth: 0, minHeight: 64, paddingTop: 6,
-    shadowColor: '#0F1B33', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: -4 }, elevation: 12,
+    shadowColor: shadow.shadowColor, shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: -4 }, elevation: 12,
   },
   centerSlot: { flex: 1, alignItems: 'center' },
   // Capy rises ~38pt above the bar, so only head and shoulders show over the edge.
   peek: { marginTop: -38 },
   fabLabel: { fontSize: 11, fontWeight: '700', color: colors.red, marginTop: -2 },
-});
+}));

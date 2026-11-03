@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Capy } from '@/components/Capy';
 import { Badge, Card, Header, IconTile, Loading, Notice, Screen, Text } from '@/components/ui';
-import { accents, colors, radius, space, shadow } from '@/constants/brand';
+import { accents, colors, radius, shadow, space, themed } from '@/constants/brand';
 import { tierLine } from '@/lib/capy';
 import { DAILY_ACTIVITY_CAP, POINTS, TIERS } from '@/lib/karma';
 import { useContribution } from '@/state/useContribution';
@@ -28,13 +28,13 @@ export default function ContributionScreen() {
       <View style={styles.hero} accessible accessibilityLabel={`Contribution score ${c.score}. Tier ${c.tier.label}.`}>
         <View style={styles.tierIcon}><Capy pose={tierLine(c.tier.id).pose} size={80} motion="pop" /></View>
         <Text style={{ color: '#fff', fontWeight: '600', marginTop: space.md, textAlign: 'center' }}>{tierLine(c.tier.id).text}</Text>
-        <Text style={{ color: '#C9D1E2', fontWeight: '700', letterSpacing: 1, fontSize: 12, marginTop: space.md }}>{c.tier.label.toUpperCase()}</Text>
+        <Text style={{ color: colors.heroMuted, fontWeight: '700', letterSpacing: 1, fontSize: 12, marginTop: space.md }}>{c.tier.label.toUpperCase()}</Text>
         <Text style={{ color: '#fff', fontSize: 44, fontWeight: '800', lineHeight: 50 }}>{c.score}</Text>
-        <Text style={{ color: '#C9D1E2' }}>contribution points</Text>
+        <Text style={{ color: colors.heroMuted }}>contribution points</Text>
         {c.next ? (
           <View style={{ alignSelf: 'stretch', marginTop: space.lg }}>
             <View style={styles.track}><View style={[styles.fill, { width: `${Math.round(c.progress * 100)}%` }]} /></View>
-            <Text style={{ color: '#C9D1E2', fontSize: 13, marginTop: 6, textAlign: 'center' }}>
+            <Text style={{ color: colors.heroMuted, fontSize: 13, marginTop: 6, textAlign: 'center' }}>
               {c.next.min - c.score} points to {c.next.label}
             </Text>
           </View>
@@ -91,12 +91,12 @@ export default function ContributionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  hero: { alignItems: 'center', padding: space.xl, borderRadius: radius.xl, backgroundColor: colors.navy, marginBottom: space.lg, ...shadow },
-  tierIcon: { width: 104, height: 104, borderRadius: 34, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+const styles = themed(() => StyleSheet.create({
+  hero: { alignItems: 'center', padding: space.xl, borderRadius: radius.xl, backgroundColor: colors.hero, marginBottom: space.lg, ...shadow },
+  tierIcon: { width: 104, height: 104, borderRadius: 34, backgroundColor: colors.plate, alignItems: 'center', justifyContent: 'center' },
   track: { height: 8, borderRadius: 4, backgroundColor: '#ffffff26', overflow: 'hidden' },
   fill: { height: 8, borderRadius: 4, backgroundColor: colors.red },
   tierDot: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface,
     borderWidth: 1.5, borderColor: colors.border },
   line: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-});
+}));

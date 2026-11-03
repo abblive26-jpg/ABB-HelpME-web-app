@@ -25,15 +25,27 @@ export const EXPERIENCE_OPTIONS = [
   { id: '10plus', label: '10+ years', short: '10+ yrs' },
 ] as const;
 
+/** Hobby interests people can add to their profile (up to 8). The ids are stored; the labels are shown. */
+export const INTEREST_OPTIONS = [
+  { id: 'music', label: 'Music' }, { id: 'running', label: 'Running' }, { id: 'cricket', label: 'Cricket' },
+  { id: 'football', label: 'Football' }, { id: 'fitness', label: 'Fitness' }, { id: 'yoga', label: 'Yoga' },
+  { id: 'reading', label: 'Reading' }, { id: 'travel', label: 'Travel' }, { id: 'cooking', label: 'Cooking' },
+  { id: 'movies', label: 'Movies' }, { id: 'gaming', label: 'Gaming' }, { id: 'photography', label: 'Photography' },
+  { id: 'art', label: 'Art & design' }, { id: 'gardening', label: 'Gardening' }, { id: 'volunteering', label: 'Volunteering' },
+  { id: 'tech', label: 'Tinkering with tech' },
+] as const;
+export const MAX_INTERESTS = 8;
+export const interestLabel = (id: string) => INTEREST_OPTIONS.find((i) => i.id === id)?.label ?? id;
+
 export const roleLabel = (id: string | null | undefined) => ROLE_OPTIONS.find((r) => r.id === id)?.label ?? null;
 export const experienceLabel = (id: string | null | undefined) => EXPERIENCE_OPTIONS.find((e) => e.id === id)?.label ?? null;
 const experienceShort = (id: string | null | undefined) => EXPERIENCE_OPTIONS.find((e) => e.id === id)?.short ?? null;
 
-/** "Engineer · 3–5 yrs at ABB", or null when nothing is shown. */
+/** "@calmmaple · Engineer · 3–5 yrs at ABB", or null when nothing is shown. */
 export function authorLine(a: AuthorMeta | null): string | null {
   if (!a) return null;
   const role = a.role === 'other' ? null : roleLabel(a.role);
   const exp = experienceShort(a.experience);
-  const parts = [role, exp ? `${exp} at ABB` : null].filter(Boolean);
+  const parts = [a.username ? `@${a.username}` : null, role, exp ? `${exp} at ABB` : null].filter(Boolean);
   return parts.length ? parts.join(' · ') : null;
 }

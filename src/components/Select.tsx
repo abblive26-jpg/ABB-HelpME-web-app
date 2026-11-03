@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui';
-import { MIN_TOUCH, colors, radius, space } from '@/constants/brand';
+import { colors, MIN_TOUCH, radius, space, themed } from '@/constants/brand';
 
 export type Option = { id: string; label: string; hint?: string };
 
@@ -63,8 +63,8 @@ export function Select({ label, placeholder = 'Choose…', options, value, onCha
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: '#0F1B3366' },
+const styles = themed(() => StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: colors.scrim },
   sheet: { maxHeight: '75%', backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: space.lg },
   grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: space.md },
   option: { minHeight: MIN_TOUCH + 4, flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.lg, paddingVertical: space.sm,
@@ -72,4 +72,4 @@ const styles = StyleSheet.create({
   optionOn: { borderColor: colors.red, backgroundColor: colors.redTint },
   field: { minHeight: MIN_TOUCH, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border,
     borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: space.md },
-});
+}));

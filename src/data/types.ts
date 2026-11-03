@@ -14,18 +14,24 @@ export interface Profile {
   experience: string | null;
   /** Appears in "People who understand" (role and experience shown, name never). */
   discoverable: boolean;
+  /** The anonymous handle: unique, chosen by the person, shown only where they choose to show who they are. Null until chosen. */
+  username: string | null;
+  /** Hobby interests (ids from INTEREST_OPTIONS), up to 8. */
+  interests: string[];
   /** The email code was confirmed (Supabase email sign-in). */
   verified: boolean;
 }
 
 /** Fields a user can change after sign-up. */
-export type ProfilePatch = Partial<Pick<Profile, 'displayName' | 'role' | 'experience' | 'lockEnabled' | 'discoverable'>>;
+export type ProfilePatch = Partial<Pick<Profile, 'displayName' | 'role' | 'experience' | 'lockEnabled' | 'discoverable' | 'username' | 'interests'>>;
 
 export interface NewProfileInput {
   displayName: string;
   lockEnabled: boolean;
   role: string | null;
   experience: string | null;
+  username?: string | null;
+  interests?: string[];
 }
 
 /** Shown on a post or answer when the author chooses to. Never includes a name. */
@@ -33,6 +39,8 @@ export interface AuthorMeta {
   role: string | null;
   experience: string | null;
   verified: boolean;
+  /** The author's anonymous username, when they chose to show who they are. */
+  username?: string | null;
 }
 
 export interface Topic {
@@ -223,6 +231,8 @@ export interface PersonMatch {
   experience: string | null;
   sharedTopics: number;
   score: number;
+  interests: string[];
+  sharedInterests: number;
 }
 
 export type WellnessKind = 'meditation' | 'breathing' | 'sleep' | 'microbreak';

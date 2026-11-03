@@ -5,24 +5,33 @@ import { Ionicons } from '@expo/vector-icons';
 import { confirmSignOut } from '@/components/accountActions';
 import { Capy, CapySays } from '@/components/Capy';
 import { OtpStep } from '@/components/OtpStep';
+import { InterestPicker } from '@/components/InterestPicker';
+import { SetPasswordForm } from '@/components/SetPasswordForm';
+import { UsernameField, type UsernameStatus } from '@/components/UsernameField';
 import { Select } from '@/components/Select';
 import { Badge, BrandMark, Button, Field, Text } from '@/components/ui';
-import { accents, colors, radius, shadow, space } from '@/constants/brand';
-import { devLoginEnabled, signInWithPassword, verifiedLabel, verifier } from '@/data/auth';
+import { accents, colors, radius, shadow, space, themed } from '@/constants/brand';
+import { signInWithPassword, verifiedLabel, verifier } from '@/data/auth';
 import { outfitForRole } from '@/lib/capy';
 import { ALLOWED_EMAIL_HINT, isAllowedEmail } from '@/lib/emailPolicy';
+import { SIGN_IN_FAILURE_TEXT } from '@/lib/password';
+import { UsernameTakenError } from '@/data/shared';
+import { usernameProblem } from '@/lib/username';
 import { EXPERIENCE_OPTIONS, ROLE_OPTIONS, roleLabel } from '@/lib/profileOptions';
 import { REQUEST_FAILURE_TEXT, VerificationError, isValidEmail, type OtpChallenge } from '@/lib/verification';
 import { useApp } from '@/state/AppProvider';
 
-/** landing → email → code → details (only for a new account without a saved profile). */
-type Mode = 'landing' | 'email' | 'code' | 'details' | 'test';
+/**
+ * landing → Login ID + password (employees, developer accounts) or email → code (emailed-code sign-in and registration) → details
+ * (only for an account without a saved profile). A new account is first asked to choose its own password, whichever way it got in.
+ */
+type Mode = 'landing' | 'email' | 'code' | 'details' | 'password';
 type Intent = 'register' | 'login';
-const STEP: Record<Exclude<Mode, 'landing'>, number> = { email: 1, code: 2, details: 3, test: 1 };
+const STEP: Record<Exclude<Mode, 'landing'>, number> = { email: 1, code: 2, details: 3, password: 1 };
 
 export default function Welcome() {
   const {
-    profile, account, signedIn, finishSignIn, createProfile, unlock, signOut,
+    profile, account, signedIn, mustChangePassword, finishSignIn, createProfile, unlock, signOut,
   } = useApp();
   // Signed in but no profile yet (e.g. the app was closed mid-registration): continue at the details step.
   const [mode, setMode] = useState<Mode>(() => (account && !profile ? 'details' : 'landing'));
@@ -31,14 +40,20 @@ export default function Welcome() {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [lock, setLock] = useState(true);
+  const [username, setUsername] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('empty');
+  const [interests, setInterests] = useState<string[]>([]);
   const [role, setRole] = useState<string | null>(null);
   const [experience, setExperience] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const emailOk = isAllowedEmail(email);
+  /** A new account must choose its own password before anything else, whichever way it signed in. */
+  const forcePassword = signedIn && mustChangePassword;
 
   const goBack = useCallback(() => {
     setError(null);
@@ -80,26 +95,38 @@ export default function Welcome() {
     }
   };
 
-  /** Test accounts only (see signInWithPassword). */
-  const testSignIn = async () => {
+  /** Login ID + password. */
+  const passwordSignIn = async () => {
+    if (!isValidEmail(email)) { setError('Enter your Login ID, which is your work email address.'); return; }
     setBusy(true); setError(null);
-    const ok = await signInWithPassword(email, password);
-    if (!ok) { setError('Wrong email or password, or the test account is not confirmed.'); setBusy(false); return; }
+    const r = await signInWithPassword(email, password);
+    if (!r.ok) { setError(SIGN_IN_FAILURE_TEXT[r.reason]); setBusy(false); return; }
+    setPassword('');
     try {
-      const r = await finishSignIn();
-      if (r === 'needs_profile') setMode('details');
+      const res = await finishSignIn();
+      if (res === 'needs_profile') setMode('details');
+      // 'needs_password': the panel below takes over. 'ready': navigation moves on by itself.
     } catch { setError('Could not finish signing in. Please try again.'); }
     setBusy(false);
   };
 
+  /** The new password is saved: carry on with the profile steps, exactly as after registering. */
+  const onPasswordSet = async () => {
+    try {
+      const res = await finishSignIn();
+      if (res === 'needs_profile') setMode('details');
+    } catch { setError('Could not finish signing in. Please try again.'); }
+  };
+
   const onCreate = async () => {
     if (name.trim().length > 30) { setError('Please keep your name within 30 characters.'); return; }
+    if (usernameProblem(username) || usernameStatus === 'taken') { setMissing(true); return; }
     if (!role || !experience) { setMissing(true); return; }
     setBusy(true); setError(null);
     try {
-      await createProfile({ displayName: name.trim(), lockEnabled: lock, role, experience });
-    } catch {
-      setError('Could not create your profile. Please try again.');
+      await createProfile({ displayName: name.trim(), lockEnabled: lock, role, experience, username: username.trim(), interests });
+    } catch (e) {
+      setError(e instanceof UsernameTakenError ? 'That username was just taken. Please choose another.' : 'Could not create your profile. Please try again.');
       setBusy(false);
     }
   };
@@ -122,6 +149,28 @@ export default function Welcome() {
     ? (isValidEmail(email) ? REQUEST_FAILURE_TEXT.domain : 'Enter a valid email address.')
     : error;
 
+  if (forcePassword) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1, padding: space.xl }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: space.lg }}>
+              <Button label="Sign out" variant="ghost" icon="log-out-outline" onPress={() => { void signOut(); setMode('landing'); }} style={{ paddingHorizontal: 0 }} />
+              <View style={{ flex: 1 }} />
+              <Text variant="label" style={{ color: colors.red, letterSpacing: 1 }}>FIRST SIGN-IN</Text>
+            </View>
+            <CapySays pose="support" message="Before we start, choose a password that only you know." size={96} motion="pop" tint={colors.bg} />
+            <Text variant="title" accessibilityRole="header" style={{ marginTop: space.xl, marginBottom: space.xs }}>Choose your password</Text>
+            <Text variant="small" style={{ marginBottom: space.lg }}>
+              {account?.email ? `Signed in as ${account.email}. ` : ''}The starting password you were given only works once. Next you will set up your profile.
+            </Text>
+            <SetPasswordForm onDone={onPasswordSet} submitLabel="Save and continue" />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -132,7 +181,7 @@ export default function Welcome() {
                 <Button label={mode === 'details' ? 'Cancel' : 'Back'} variant="ghost" icon="chevron-back" onPress={goBack}
                   style={{ paddingHorizontal: 0 }} />
                 <View style={{ flex: 1 }} />
-                {mode === 'test' ? <Text variant="label" style={{ color: colors.red, letterSpacing: 1 }}>TEST SIGN-IN</Text>
+                {mode === 'password' ? <Text variant="label" style={{ color: colors.red, letterSpacing: 1 }}>LOG IN</Text>
                   : <Text variant="label" style={{ color: colors.red, letterSpacing: 1 }}>STEP {STEP[mode]} OF {steps}</Text>}
               </View>
 
@@ -166,17 +215,28 @@ export default function Welcome() {
                   onVerified={onVerified} onChangeEmail={() => { setMode('email'); setError(null); }} />
               ) : null}
 
-              {mode === 'test' ? (
+              {mode === 'password' ? (
                 <View>
-                  <Text variant="title" accessibilityRole="header" style={{ marginBottom: space.xs }}>Test sign-in</Text>
+                  <CapySays pose="hi" message="Welcome! Log in with the Login ID you were given." size={96} motion="pop" tint={colors.bg} />
+                  <Text variant="title" accessibilityRole="header" style={{ marginTop: space.xl, marginBottom: space.xs }}>Log in</Text>
                   <Text variant="small" style={{ marginBottom: space.lg }}>
-                    For dummy accounts created in the Supabase dashboard. No email is sent. Not for real colleagues.
+                    Your Login ID is your work email address. Use the starting password from your welcome note; you will choose your own next.
                   </Text>
-                  <Field label="Email" value={email} onChangeText={(t) => { setEmail(t); setError(null); }} placeholder="test1@outlook.com"
-                    keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
-                  <Field label="Password" value={password} onChangeText={(t) => { setPassword(t); setError(null); }} secureTextEntry
-                    autoCapitalize="none" autoCorrect={false} error={error} onSubmitEditing={testSignIn} returnKeyType="go" />
-                  <Button label="Sign in" onPress={testSignIn} loading={busy} disabled={!email.trim() || !password} />
+                  <Field label="Login ID" value={email} onChangeText={(t) => { setEmail(t); setError(null); }} placeholder="firstname.lastname@in.abb.com"
+                    keyboardType="email-address" autoCapitalize="none" autoCorrect={false} textContentType="username" autoComplete="username" returnKeyType="next" />
+                  <Field label="Password" value={password} onChangeText={(t) => { setPassword(t); setError(null); }} secureTextEntry={!showPassword}
+                    autoCapitalize="none" autoCorrect={false} textContentType="password" autoComplete="current-password"
+                    error={error} onSubmitEditing={passwordSignIn} returnKeyType="go" />
+                  <Text variant="small" style={[styles.link, { alignSelf: 'flex-start', marginBottom: space.lg }]} accessibilityRole="button"
+                    onPress={() => setShowPassword((v) => !v)}>{showPassword ? 'Hide password' : 'Show password'}</Text>
+                  <Button label="Log in" onPress={passwordSignIn} loading={busy} disabled={!email.trim() || !password} />
+                  <Text variant="small" style={{ textAlign: 'center', marginTop: space.lg }}>
+                    Forgot your password?{' '}
+                    <Text variant="small" style={styles.link} accessibilityRole="button" onPress={() => start('login')}>Email me a sign-in code</Text>
+                  </Text>
+                  <Text variant="small" style={{ textAlign: 'center', marginTop: space.sm }}>
+                    No email access? Ask your administrator to reset your password.
+                  </Text>
                 </View>
               ) : null}
 
@@ -190,6 +250,8 @@ export default function Welcome() {
                       {account?.email ? `Signed in as ${account.email}` : 'Email verified.'}
                     </Text>
                   </View>
+                  <UsernameField value={username} onChange={(v) => { setUsername(v); setMissing(false); }} onStatus={setUsernameStatus} />
+                  {missing && !username.trim() ? <Text style={[styles.error, { textAlign: 'left', marginTop: -space.sm, marginBottom: space.md }]}>Please choose a username.</Text> : null}
                   <Field label="What should we call you? (optional)" value={name} onChangeText={setName}
                     placeholder="First name or nickname" maxLength={40} autoCapitalize="words"
                     hint="Only shown to you. Posts never show your name or email." />
@@ -197,7 +259,8 @@ export default function Welcome() {
                     options={ROLE_OPTIONS} error={missing && !role ? 'Please choose a role (or "Prefer not to say").' : null} />
                   <Select label="Experience at ABB" placeholder="Choose a range" value={experience} onChange={(v) => { setExperience(v); setMissing(false); }}
                     options={EXPERIENCE_OPTIONS} error={missing && !experience ? 'Please choose a range.' : null}
-                    hint="You decide per post whether your role and experience are shown." />
+                    hint="You decide per post whether your username, role and experience are shown." />
+                  <InterestPicker value={interests} onChange={setInterests} />
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: space.xl }}>
                     <View style={{ flex: 1, paddingRight: space.md }}>
                       <Text variant="h3">Lock with device authentication</Text>
@@ -242,18 +305,17 @@ export default function Welcome() {
                   </>
                 ) : (
                   <>
-                    <Button label="Get Started" onPress={() => start('register')} />
-                    {devLoginEnabled ? <Button label="Test sign-in (dummy accounts)" variant="ghost" onPress={() => { setError(null); setMode('test'); }} /> : null}
+                    <Button label="Log in" onPress={() => { setError(null); setMode('password'); }} />
                     <Text variant="small" style={{ textAlign: 'center' }}>
-                      Existing user?{' '}
-                      <Text variant="small" style={styles.link} accessibilityRole="button" onPress={() => start('login')}>Log in</Text>
+                      New here?{' '}
+                      <Text variant="small" style={styles.link} accessibilityRole="button" onPress={() => start('register')}>Create an account</Text>
                     </Text>
                   </>
                 )}
                 <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.sm }}>
                   <Ionicons name="phone-portrait-outline" size={16} color={colors.muted} style={{ marginTop: 1 }} />
                   <Text variant="small" style={{ flex: 1, fontSize: 12, lineHeight: 16 }}>
-                    Your account is protected by an emailed code. Mood check-ins and saved items are visible only to you. Posts are shared without your name or email.
+                    Your account is protected by your password. Mood check-ins and saved items are visible only to you. Posts are shared without your name or email.
                   </Text>
                 </View>
               </View>
@@ -265,7 +327,7 @@ export default function Welcome() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   headline: { fontSize: 30, lineHeight: 36, fontWeight: '800', color: colors.navy, textAlign: 'center', marginTop: space.xl, letterSpacing: -0.4 },
   heroWrap: { alignItems: 'center', justifyContent: 'center', marginVertical: space.xl, minHeight: 270 },
   halo: { position: 'absolute', width: 250, height: 250, borderRadius: 125, backgroundColor: accents.rose.bg },
@@ -275,4 +337,4 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, backgroundColor: accents.green.bg },
   link: { color: colors.red, fontWeight: '700', textDecorationLine: 'underline' },
   error: { color: colors.redDark, textAlign: 'center' },
-});
+}));

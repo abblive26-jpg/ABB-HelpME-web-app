@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { OptionSheet } from '@/components/Select';
 import { Text } from '@/components/ui';
-import { accents, colors } from '@/constants/brand';
+import { accents, colors, themed } from '@/constants/brand';
 import { DOWNVOTE_REASONS, type AuthorMeta, type DownvoteReason, type Vote, type VoteValue } from '@/data/types';
 import { authorLine } from '@/lib/profileOptions';
 import { verifiedLabel } from '@/data/auth';
@@ -57,8 +57,8 @@ export function VoteControl({ score, vote, allowDown = true, disabled, onVote, h
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   author: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   vote: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   voteBtn: { minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
-});
+}));

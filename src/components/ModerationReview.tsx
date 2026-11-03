@@ -3,14 +3,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Capy } from '@/components/Capy';
 import { Button, Card, Text } from '@/components/ui';
-import { accents, colors, space } from '@/constants/brand';
+import { accents, colors, space, themed } from '@/constants/brand';
 import type { ModerationResult } from '@/lib/moderation';
 
-const TONE = {
-  block: { icon: 'close-circle', color: colors.redDark },
-  warn: { icon: 'alert-circle', color: accents.amber.fg },
-  support: { icon: 'heart-circle', color: accents.rose.fg },
-} as const;
+const TONE = themed(() => ({
+  block: { icon: 'close-circle' as const, color: colors.redDark },
+  warn: { icon: 'alert-circle' as const, color: accents.amber.fg },
+  support: { icon: 'heart-circle' as const, color: accents.rose.fg },
+}));
 
 /**
  * Shown in place of saving when the on-device check finds something.
@@ -21,7 +21,7 @@ export function ModerationReview({ result, onEdit, onPostAnyway, busy }: {
 }) {
   const support = result.issues.some((i) => i.severity === 'support');
   return (
-    <Card style={{ marginBottom: space.lg, borderColor: result.ok ? accents.amber.bg : '#F5B8C2' }}>
+    <Card style={{ marginBottom: space.lg, borderColor: result.ok ? accents.amber.bg : colors.redLine }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.md }}>
         <Capy pose={support ? 'support' : result.ok ? 'thinking' : 'concerned'} size={72} motion="pop" />
         <View style={{ flex: 1 }}>

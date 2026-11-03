@@ -43,6 +43,43 @@ alter table public.profiles add column if not exists reminder_break boolean not 
 -- "People who understand": opt-in discovery. discover_code is an opaque handle, never a user id.
 alter table public.profiles add column if not exists discoverable boolean not null default false;
 alter table public.profiles add column if not exists discover_code text unique default substr(md5(gen_random_uuid()::text), 1, 12);
+-- Anonymous username: chosen by the person, unique (ignoring case), never their name or email. Shown only where they choose
+-- to show who they are (posts, answers) and on "People who understand". Interests are hobby tags (up to 8) used to find common ground.
+alter table public.profiles add column if not exists username text;
+alter table public.profiles add column if not exists interests text[] not null default '{}';
+alter table public.profiles drop constraint if exists profiles_username_format;
+alter table public.profiles add constraint profiles_username_format check (username is null or username ~ '^[A-Za-z0-9][A-Za-z0-9_.]{2,19}$');
+alter table public.profiles drop constraint if exists profiles_interests_max;
+alter table public.profiles add constraint profiles_interests_max check (cardinality(interests) <= 8);
+create unique index if not exists profiles_username_unique on public.profiles (lower(username));
+
+-- Names that could be mistaken for staff or the app itself.
+create or replace function public.username_reserved(p text)
+returns boolean language sql immutable as $$
+  select lower(coalesce(p, '')) ~ '(admin|moderator|abbhelp|support|official|cappy|staff|system|helpdesk)' or lower(coalesce(p, '')) = 'abb'
+$$;
+create or replace function public.profiles_guard_username()
+returns trigger language plpgsql as $$
+begin
+  if new.username is not null and public.username_reserved(new.username) then
+    raise exception 'That username is not available.' using errcode = '23514';
+  end if;
+  return new;
+end $$;
+drop trigger if exists profiles_username_guard on public.profiles;
+create trigger profiles_username_guard before insert or update of username on public.profiles
+  for each row execute function public.profiles_guard_username();
+
+-- Live "is this free?" check for the sign-up and edit screens. Reveals only whether a name is taken.
+create or replace function public.username_available(p_name text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select public.is_member()
+     and coalesce(p_name, '') ~ '^[A-Za-z0-9][A-Za-z0-9_.]{2,19}$'
+     and not public.username_reserved(p_name)
+     and not exists (select 1 from public.profiles x where lower(x.username) = lower(p_name) and x.id <> auth.uid())
+$$;
+revoke all on function public.username_available(text) from public, anon;
+grant execute on function public.username_available(text) to authenticated;
 
 create table if not exists public.communities (
   id text primary key,
@@ -85,6 +122,7 @@ create table if not exists public.posts (
 -- Older installs only allowed two kinds and no title rule.
 alter table public.posts add column if not exists community_id text references public.communities (id) on delete set null;
 alter table public.posts add column if not exists attachments text[] not null default '{}';
+alter table public.posts add column if not exists author_username text;
 alter table public.posts drop constraint if exists posts_attachments_max;
 alter table public.posts add constraint posts_attachments_max check (cardinality(attachments) <= 4);
 alter table public.posts drop constraint if exists posts_kind_check;
@@ -103,6 +141,8 @@ create table if not exists public.comments (
   author_experience text,
   created_at timestamptz not null default now()
 );
+
+alter table public.comments add column if not exists author_username text;
 
 create table if not exists public.votes (
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
@@ -206,7 +246,8 @@ select p.id, p.kind, p.category, p.title, p.body,
        p.accepted_comment_id, p.created_at, p.updated_at,
        p.community_id, p.attachments,
        exists (select 1 from public.community_leaders l where l.community_id = p.community_id and l.user_id = p.user_id) as is_leader,
-       (p.user_id = auth.uid()) as mine
+       (p.user_id = auth.uid()) as mine,
+       case when p.show_author then p.author_username end as author_username
 from public.posts p
 where public.is_member()
   and (p.user_id = auth.uid()
@@ -218,7 +259,8 @@ select c.id, c.post_id, c.body,
        case when c.show_author then c.author_role end as author_role,
        case when c.show_author then c.author_experience end as author_experience,
        c.created_at,
-       (c.user_id = auth.uid()) as mine
+       (c.user_id = auth.uid()) as mine,
+       case when c.show_author then c.author_username end as author_username
 from public.comments c
 join public.posts_feed f on f.id = c.post_id
 where public.is_member();
@@ -340,6 +382,18 @@ revoke insert on public.notifications from authenticated;
 -- ---------------------------------------------------------------------------------------------
 -- Integrity triggers
 -- ---------------------------------------------------------------------------------------------
+-- When an author chooses to show who they are, the post or answer carries their username (looked up here, never trusted from the client).
+create or replace function public.set_author_username()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.author_username := case when new.show_author then (select username from public.profiles where id = new.user_id) end;
+  return new;
+end $$;
+drop trigger if exists posts_author_username on public.posts;
+create trigger posts_author_username before insert on public.posts for each row execute function public.set_author_username();
+drop trigger if exists comments_author_username on public.comments;
+create trigger comments_author_username before insert on public.comments for each row execute function public.set_author_username();
+
 create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $$
 begin new.updated_at = now(); return new; end $$;
@@ -760,14 +814,18 @@ revoke all on public.my_conversations, public.my_messages from public, anon;
 grant select on public.my_conversations, public.my_messages to authenticated;
 
 -- Opt-in matches by role, experience and shared topics. Returns opaque codes, never account ids.
-create or replace function public.discover_people(p_limit integer default 10)
-returns table (code text, alias text, role text, experience text, shared_topics integer, score integer)
+drop function if exists public.discover_people(integer);
+create function public.discover_people(p_limit integer default 10)
+returns table (code text, alias text, role text, experience text, shared_topics integer, score integer, interests text[], shared_interests integer)
 language sql stable security definer set search_path = public as $$
-  select p.discover_code, public.alias_for(p.discover_code), p.role, p.experience,
+  select p.discover_code, coalesce(p.username, public.alias_for(p.discover_code)), p.role, p.experience,
          (select count(*) from unnest(p.topics) t where t = any (me.topics))::integer,
          ((case when p.role is not null and p.role = me.role then 3 else 0 end)
           + (case when p.experience is not null and p.experience = me.experience then 2 else 0 end)
-          + (select count(*) from unnest(p.topics) t where t = any (me.topics)))::integer
+          + (select count(*) from unnest(p.topics) t where t = any (me.topics))
+          + (select count(*) from unnest(p.interests) i where i = any (me.interests)))::integer,
+         p.interests,
+         (select count(*) from unnest(p.interests) i where i = any (me.interests))::integer
   from public.profiles p
   join public.profiles me on me.id = auth.uid()
   where public.is_member() and p.discoverable and p.onboarding_complete and p.id <> me.id
@@ -1322,14 +1380,15 @@ begin
 end $$;
 
 -- ---- users ----------------------------------------------------------------------------------
-create or replace function public.admin_users(p_search text default '', p_limit integer default 50, p_offset integer default 0)
-returns table (id uuid, email text, display_name text, role text, experience text, created_at timestamptz, last_sign_in_at timestamptz,
+drop function if exists public.admin_users(text, integer, integer);
+create function public.admin_users(p_search text default '', p_limit integer default 50, p_offset integer default 0)
+returns table (id uuid, email text, display_name text, username text, role text, experience text, created_at timestamptz, last_sign_in_at timestamptz,
                suspended boolean, staff_role text, posts integer, comments integer, reports_against integer, chat_reports_against integer, total bigint)
 language plpgsql stable security definer set search_path = public as $$
 begin
   perform public.require_staff();
   return query
-  select u.id, u.email::text, p.display_name, p.role, p.experience, coalesce(p.created_at, u.created_at), u.last_sign_in_at,
+  select u.id, u.email::text, p.display_name, p.username, p.role, p.experience, coalesce(p.created_at, u.created_at), u.last_sign_in_at,
          coalesce(p.suspended, false), s.role,
          (select count(*) from public.posts x where x.user_id = u.id)::integer,
          (select count(*) from public.comments x where x.user_id = u.id)::integer,
@@ -1340,7 +1399,7 @@ begin
   left join public.profiles p on p.id = u.id
   left join public.staff s on s.user_id = u.id
   where coalesce(p_search, '') = ''
-     or u.email ilike '%' || p_search || '%' or p.display_name ilike '%' || p_search || '%'
+     or u.email ilike '%' || p_search || '%' or p.display_name ilike '%' || p_search || '%' or p.username ilike '%' || p_search || '%'
   order by coalesce(p.created_at, u.created_at) desc
   limit least(greatest(p_limit, 1), 200) offset greatest(p_offset, 0);
 end $$;
@@ -1539,6 +1598,28 @@ begin
   perform public.log_admin('delete_user', 'user', p_user::text, jsonb_build_object('reason', p_reason, 'email', mail));
 end $$;
 
+-- For someone locked out: sets a new starting password (the admin console generates it and shows it once). The person
+-- is signed out everywhere and must choose their own password at next sign-in. The password is never written to the audit log.
+create or replace function public.admin_reset_password(p_user uuid, p_password text, p_reason text default '')
+returns void language plpgsql security definer set search_path = public as $$
+declare mail text;
+begin
+  perform public.require_admin();
+  if exists (select 1 from public.staff where user_id = p_user) then raise exception 'Staff passwords are managed in Supabase'; end if;
+  if char_length(coalesce(p_password, '')) < 8 or char_length(p_password) > 72 then raise exception 'The password must be 8 to 72 characters'; end if;
+  select email into mail from auth.users where id = p_user;
+  if mail is null then raise exception 'User not found'; end if;
+  update auth.users
+     set encrypted_password = extensions.crypt(p_password, extensions.gen_salt('bf')),
+         raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object('must_change_password', true),
+         updated_at = now()
+   where id = p_user;
+  if to_regclass('auth.sessions') is not null then
+    execute 'delete from auth.sessions where user_id = $1' using p_user;
+  end if;
+  perform public.log_admin('reset_password', 'user', p_user::text, jsonb_build_object('reason', p_reason, 'email', mail));
+end $$;
+
 create or replace function public.admin_save_resource(
   p_id text, p_grp text, p_title text, p_subtitle text, p_body text, p_url text, p_phone text, p_email text,
   p_verified boolean, p_source text, p_reviewed_at date, p_sort integer)
@@ -1601,7 +1682,7 @@ begin
     'public.admin_list_resources()', 'public.admin_communities()', 'public.admin_audit_log(integer)',
     'public.admin_delete_post(text, text)', 'public.admin_delete_comment(text, text)', 'public.admin_dismiss_reports(text, text)',
     'public.admin_dismiss_chat_reports(uuid, text)', 'public.admin_set_suspended(uuid, boolean, text)',
-    'public.admin_update_user(uuid, text, text, text)', 'public.admin_delete_user(uuid, text)',
+    'public.admin_update_user(uuid, text, text, text)', 'public.admin_delete_user(uuid, text)', 'public.admin_reset_password(uuid, text, text)',
     'public.admin_save_resource(text, text, text, text, text, text, text, text, boolean, text, date, integer)',
     'public.admin_delete_resource(text)', 'public.admin_set_leader(text, text, boolean)']
   loop

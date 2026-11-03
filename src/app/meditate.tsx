@@ -7,7 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Capy } from '@/components/Capy';
 import { Button, Card, Chip, Header, IconButton, Notice, Screen, Text } from '@/components/ui';
-import { colors, space } from '@/constants/brand';
+import { accents, colors, space, themed } from '@/constants/brand';
 import { attempt } from '@/lib/attempt';
 import {
   DURATIONS, KIND_OF_MODE, MEDITATION_PROMPTS, PATTERNS, SCALE_SMALL, SLEEP_PROMPTS, SOUNDS, decodePreset, encodePreset, patternById,
@@ -241,13 +241,13 @@ function Player({ preset, onEnd }: { preset: SessionPreset; onEnd: (seconds: num
 }
 
 const CIRCLE = 220;
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   bars: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 52, marginTop: space.lg, gap: 6 },
   bar: { flex: 1, borderRadius: 4 },
   player: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   box: { width: CIRCLE, height: CIRCLE, alignItems: 'center', justifyContent: 'center' },
-  circle: { position: 'absolute', width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2, backgroundColor: '#FBD5DC' },
+  circle: { position: 'absolute', width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2, backgroundColor: accents.rose.bg },
   phase: { fontSize: 28, fontWeight: '800', marginTop: space.lg },
-});
+}));
 

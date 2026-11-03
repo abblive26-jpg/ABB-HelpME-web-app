@@ -2,12 +2,13 @@ import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { Capy } from '@/components/Capy';
+import { ThemePicker } from '@/components/ThemePicker';
 import { Badge, Button, Header, Row, RowGroup, Screen, Text } from '@/components/ui';
-import { colors, radius, shadow, space } from '@/constants/brand';
+import { colors, radius, shadow, space, themed } from '@/constants/brand';
 import { outfitForRole } from '@/lib/capy';
 import { MoodIcon } from '@/components/MoodIcon';
 import { MOOD_LABEL, periodStats } from '@/lib/moodStats';
-import { authorLine, roleLabel } from '@/lib/profileOptions';
+import { authorLine, interestLabel, roleLabel } from '@/lib/profileOptions';
 import { confirmDeleteAccount, confirmSignOut } from '@/components/accountActions';
 import { attempt } from '@/lib/attempt';
 import { syncReminders } from '@/lib/reminders';
@@ -27,6 +28,8 @@ export default function MyProfile() {
   const week = stats ? periodStats(stats.moods, 7) : null;
   const name = profile?.displayName && profile.displayName !== 'there' ? profile.displayName : 'Your profile';
   const line = profile ? authorLine({ role: profile.role, experience: profile.experience, verified: profile.verified }) : null;
+  const handle = profile?.username ? `@${profile.username}` : null;
+  const interestLine = profile?.interests.length ? profile.interests.map(interestLabel).join(' · ') : null;
   const version = Constants.expoConfig?.version ?? '1.0.0';
 
   const setPref = async (patch: Partial<NonNullable<typeof stats>['prefs']>) => {
@@ -47,8 +50,9 @@ export default function MyProfile() {
           <Capy pose={outfitForRole(profile?.role)} size={78} motion="none" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text variant="h2" style={{ color: '#fff' }} numberOfLines={1}>{name}</Text>
-          <Text variant="small" style={{ color: '#C9D1E2' }}>{line ?? (profile?.role ? roleLabel(profile.role) : 'Role not set')}</Text>
+          <Text variant="h2" style={{ color: '#fff' }} numberOfLines={1}>{handle ?? name}</Text>
+          <Text variant="small" style={{ color: colors.heroMuted }}>{line ?? (profile?.role ? roleLabel(profile.role) : 'Role not set')}</Text>
+          {interestLine ? <Text variant="small" numberOfLines={1} style={{ color: colors.heroMuted }}>{interestLine}</Text> : null}
           <View style={{ flexDirection: 'row', marginTop: 6 }}>
             {profile?.verified ? <Badge label={verifiedLabel()} tone="ok" /> : null}
           </View>
@@ -74,8 +78,13 @@ export default function MyProfile() {
         {account?.email
           ? <Row icon="mail-outline" accent="blue" title="Signed in as" subtitle={account.email} onPress={() => router.push('/profile')} />
           : null}
-        <Row icon="person-outline" accent="slate" title="Role & experience" subtitle={line ?? 'Not set'} onPress={() => router.push('/profile')} />
+        <Row icon="person-outline" accent="slate" title="Username, role & interests" subtitle={handle ? `${handle}${line ? ` · ${line}` : ''}` : 'Choose your anonymous username'} onPress={() => router.push('/profile')} />
         <Row icon="options-outline" accent="rose" title="Your categories" subtitle="Choose what you follow" onPress={() => router.push('/topics')} />
+        <Row icon="key-outline" accent="amber" title="Change password" subtitle="Choose a new password" onPress={() => router.push('/change-password')} />
+      </RowGroup>
+
+      <RowGroup title="Appearance">
+        <ThemePicker />
       </RowGroup>
 
       <RowGroup title="Security & privacy">
@@ -141,11 +150,11 @@ function Stat({ label, value, sub, onPress, icon }: { label: string; value: stri
   );
 }
 
-const styles = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.xl, backgroundColor: colors.navy,
+const styles = themed(() => StyleSheet.create({
+  card: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.xl, backgroundColor: colors.hero,
     marginBottom: space.md, ...shadow },
-  capyPlate: { width: 84, height: 92, borderRadius: 26, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 4 },
+  capyPlate: { width: 84, height: 92, borderRadius: 26, backgroundColor: colors.plate, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 4 },
   editBtn: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: '#ffffff55' },
   statsRow: { flexDirection: 'row', gap: space.sm, marginBottom: space.sm },
-  stat: { flex: 1, padding: space.md, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: '#EEF0F5', ...shadow },
-});
+  stat: { flex: 1, padding: space.md, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, ...shadow },
+}));

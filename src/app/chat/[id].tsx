@@ -5,7 +5,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { OptionSheet } from '@/components/Select';
 import { Badge, Button, EmptyState, ErrorState, Header, IconButton, Loading, Notice, Text } from '@/components/ui';
-import { colors, radius, space } from '@/constants/brand';
+import { colors, radius, space, themed } from '@/constants/brand';
 import { attempt } from '@/lib/attempt';
 import { isUrgentText } from '@/lib/assistant';
 import { confirmContent } from '@/lib/confirmContent';
@@ -181,7 +181,7 @@ export default function Chat() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   fill: { flex: 1, backgroundColor: colors.bg },
   safety: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginHorizontal: space.lg, padding: space.sm, borderRadius: radius.md, backgroundColor: colors.sand },
   bubble: { maxWidth: '82%', paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.lg },
@@ -190,4 +190,4 @@ const styles = StyleSheet.create({
   composer: { padding: space.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
   input: { flex: 1, minHeight: 48, maxHeight: 120, paddingHorizontal: space.md, paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1.5,
     borderColor: colors.border, backgroundColor: colors.bg, color: colors.navy, fontSize: 16 },
-});
+}));

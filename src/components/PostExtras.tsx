@@ -2,7 +2,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui';
-import { accents, colors, radius, space } from '@/constants/brand';
+import { accents, colors, radius, space, themed } from '@/constants/brand';
 import { attempt } from '@/lib/attempt';
 import { useApp } from '@/state/AppProvider';
 import { useData } from '@/state/useData';
@@ -53,10 +53,10 @@ export function PollView({ postId }: { postId: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   photo: { width: 220, height: 160, borderRadius: radius.lg },
   option: { flexDirection: 'row', alignItems: 'center', minHeight: 48, paddingHorizontal: space.md, borderRadius: radius.lg, borderWidth: 1.5,
     borderColor: colors.border, backgroundColor: colors.surface, marginBottom: space.sm, overflow: 'hidden' },
   optionMine: { borderColor: colors.red },
   bar: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: colors.sand },
-});
+}));

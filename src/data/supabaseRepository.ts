@@ -2,7 +2,7 @@ import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { newId } from '@/lib/id';
 import { TOPIC_CATALOGUE } from '@/lib/topics';
-import { authorSnapshot } from './shared';
+import { UsernameTakenError, authorSnapshot } from './shared';
 import type { Repository } from './repository';
 import type {
   AppNotification, AuthorMeta, Bookmark, BookmarkType, ChatFlag, ChatMessage, Comment, Community, CommunityStat, Conversation,
@@ -20,7 +20,7 @@ import type {
  * change their own rows. Every request carries the signed-in user's JWT.
  */
 
-type AuthorCols = { show_author: boolean; author_role: string | null; author_experience: string | null };
+type AuthorCols = { show_author: boolean; author_role: string | null; author_experience: string | null; author_username?: string | null };
 type PostRow = {
   id: string; kind: PostKind; category: string; title: string; body: string; accepted_comment_id: string | null;
   created_at: string; updated_at: string; mine?: boolean;
@@ -31,7 +31,7 @@ type VoteRow = { target_type: VoteTarget; target_id: string; value: number; reas
 type ProfileRow = {
   id: string; display_name: string; role: string | null; experience: string | null; lock_enabled: boolean;
   onboarding_complete: boolean; topics: string[]; daily_reminder: boolean; resource_tips: boolean; created_at: string;
-  reminder_hydration: boolean; reminder_break: boolean; discoverable: boolean;
+  reminder_hydration: boolean; reminder_break: boolean; discoverable: boolean; username: string | null; interests: string[] | null;
 };
 type MoodRow = { id: string; mood: Mood; tags: MoodTag[]; created_at: string };
 type BookmarkRow = { type: BookmarkType; item_id: string; created_at: string };
@@ -45,7 +45,7 @@ type NotificationRow = {
 };
 
 const toAuthor = (r: AuthorCols): AuthorMeta | null =>
-  r.show_author ? { role: r.author_role, experience: r.author_experience, verified: true } : null;
+  r.show_author ? { role: r.author_role, experience: r.author_experience, verified: true, username: r.author_username ?? null } : null;
 
 const toPost = (r: PostRow, mine = r.mine ?? false): Post => ({
   id: r.id, kind: r.kind, category: r.category, title: r.title, body: r.body,
@@ -65,7 +65,15 @@ const toVote = (r: VoteRow): Vote => ({
 const toProfile = (r: ProfileRow): Profile => ({
   id: r.id, displayName: r.display_name, lockEnabled: r.lock_enabled, onboardingComplete: r.onboarding_complete,
   createdAt: Date.parse(r.created_at), role: r.role, experience: r.experience, verified: true, discoverable: !!r.discoverable,
+  username: r.username ?? null, interests: r.interests ?? [],
 });
+
+/** The database refuses a duplicate or reserved username; say so plainly. */
+function usernameFailure(e: unknown): never {
+  const err = e as { code?: string; message?: string };
+  if ((err?.code === '23505' || err?.code === '23514') && /username/i.test(err.message ?? '')) throw new UsernameTakenError();
+  throw e;
+}
 
 const toResource = (r: ResourceRow): Resource => ({
   id: r.id, group: r.grp, title: r.title, subtitle: r.subtitle, body: r.body,
@@ -111,11 +119,13 @@ export class SupabaseRepository implements Repository {
 
   async createProfile(input: NewProfileInput): Promise<Profile> {
     const me = await this.uid();
-    const row = ok(await this.client.from('profiles').upsert({
-      id: me, display_name: input.displayName.trim() || 'there', role: input.role, experience: input.experience,
-      lock_enabled: input.lockEnabled,
-    }, { onConflict: 'id' }).select('*').single());
-    return toProfile(row as ProfileRow);
+    try {
+      const row = ok(await this.client.from('profiles').upsert({
+        id: me, display_name: input.displayName.trim() || 'there', role: input.role, experience: input.experience,
+        lock_enabled: input.lockEnabled, username: input.username?.trim() || null, interests: input.interests ?? [],
+      }, { onConflict: 'id' }).select('*').single());
+      return toProfile(row as ProfileRow);
+    } catch (e) { return usernameFailure(e); }
   }
 
   async updateProfile(patch: ProfilePatch): Promise<Profile | null> {
@@ -126,9 +136,13 @@ export class SupabaseRepository implements Repository {
     if (patch.experience !== undefined) cols.experience = patch.experience;
     if (patch.lockEnabled !== undefined) cols.lock_enabled = patch.lockEnabled;
     if (patch.discoverable !== undefined) cols.discoverable = patch.discoverable;
+    if (patch.username !== undefined) cols.username = patch.username?.trim() || null;
+    if (patch.interests !== undefined) cols.interests = patch.interests;
     if (!Object.keys(cols).length) return this.getProfile();
-    const row = ok(await this.client.from('profiles').update(cols).eq('id', me).select('*').maybeSingle());
-    return row ? toProfile(row as ProfileRow) : null;
+    try {
+      const row = ok(await this.client.from('profiles').update(cols).eq('id', me).select('*').maybeSingle());
+      return row ? toProfile(row as ProfileRow) : null;
+    } catch (e) { return usernameFailure(e); }
   }
 
   async setOnboardingComplete() {
@@ -468,11 +482,17 @@ export class SupabaseRepository implements Repository {
   }
 
   // ---- people who understand / chat ------------------------------------------
+  async isUsernameAvailable(name: string): Promise<boolean> {
+    return ok(await this.client.rpc('username_available', { p_name: name })) === true;
+  }
+
   async discoverPeople(): Promise<PersonMatch[]> {
     const rows = ok(await this.client.rpc('discover_people', { p_limit: 10 })) as
-      { code: string; alias: string; role: string | null; experience: string | null; shared_topics: number; score: number }[];
+      { code: string; alias: string; role: string | null; experience: string | null; shared_topics: number; score: number;
+        interests: string[] | null; shared_interests: number }[];
     return rows.map((r) => ({
       code: r.code, alias: r.alias, role: r.role, experience: r.experience, sharedTopics: r.shared_topics, score: r.score,
+      interests: r.interests ?? [], sharedInterests: r.shared_interests ?? 0,
     }));
   }
 

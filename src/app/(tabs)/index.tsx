@@ -6,9 +6,9 @@ import { setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CapyHeroCard, type HeroSlide } from '@/components/CapyHeroCard';
 import { FeatureGrid } from '@/components/FeatureGrid';
-import { BrandMark, Card, IconButton, IconTile, Loading, Notice, Row, Screen, Text, type IconName } from '@/components/ui';
+import { BrandMark, Card, IconButton, IconTile, Loading, Notice, Row, RowGroup, Screen, Text, type IconName } from '@/components/ui';
 import { PostCard } from '@/components/PostCard';
-import { accents, colors, radius, shadow, space, type Accent } from '@/constants/brand';
+import { type Accent, accents, colors, getScheme, radius, shadow, space, themed } from '@/constants/brand';
 import { greeting, outfitForRole } from '@/lib/capy';
 import { resourcesForTopics } from '@/lib/personalize';
 import { GROUP_META } from '@/lib/resourceMeta';
@@ -28,13 +28,22 @@ const ACTIONS: Action[] = [
   { label: 'Other', hint: 'Anything else', icon: 'grid', accent: 'amber', type: 'work_question', category: 'Other' },
 ];
 
+function SectionHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  return (
+    <View style={styles.sectionHead}>
+      <Text variant="h2" accessibilityRole="header">{title}</Text>
+      {action && onAction ? <Text variant="h3" style={{ color: colors.red, fontSize: 14 }} accessibilityRole="link" onPress={onAction}>{action}</Text> : null}
+    </View>
+  );
+}
+
 export default function Home() {
   const { profile } = useApp();
   const insets = useSafeAreaInsets();
-  // White status-bar icons over the navy hero; back to dark when leaving Home.
+  // White status-bar icons over the navy hero; back to the theme's own style when leaving Home.
   useFocusEffect(useCallback(() => {
     setStatusBarStyle('light');
-    return () => setStatusBarStyle('dark');
+    return () => setStatusBarStyle(getScheme() === 'dark' ? 'light' : 'dark');
   }, []));
   const { data, loading } = useData(async (repo) => {
     const [questions, ach] = await Promise.all([repo.listPosts('work_question'), repo.listPosts('achievement')]);
@@ -69,7 +78,7 @@ export default function Home() {
 
   const slides: HeroSlide[] = [
     {
-      key: 'checkin', kicker: hello, pose: outfitForRole(profile?.role), capySize: 182,
+      key: 'checkin', kicker: hello, pose: outfitForRole(profile?.role), capySize: 176,
       title: !todayMood ? 'How are you feeling today?' : lowToday ? "I'm here for you today." : 'Thanks for checking in today!',
       actions: !todayMood ? [
         { icon: 'happy-outline', label: 'Check in', primary: true, onPress: () => router.push('/wellbeing') },
@@ -84,7 +93,7 @@ export default function Home() {
       ],
     },
     {
-      key: 'ask', kicker: 'Your help assistant', pose: 'laptop', capySize: 168,
+      key: 'ask', kicker: 'Your help assistant', pose: 'laptop', capySize: 160,
       title: 'Need a hand?\nAsk Cappy',
       actions: [
         { icon: 'chatbubble-ellipses-outline', label: 'Ask Cappy', primary: true, onPress: () => router.push('/assistant') },
@@ -92,8 +101,7 @@ export default function Home() {
       ],
     },
     {
-      // Dark-hoodie pose: the white-hoodie cut-outs show background specks on the navy card.
-      key: 'week', kicker: 'Your week', pose: 'outfit_casual', capySize: 178,
+      key: 'week', kicker: 'Your week', pose: 'outfit_casual', capySize: 172,
       title: week?.averageMood ? `Mostly ${MOOD_LABEL[week.averageMood].toLowerCase()}\n${week.checkinDays} of 7 days` : 'Start your week with a check-in',
       actions: [
         { icon: 'stats-chart-outline', label: 'Mood trends', primary: true, onPress: () => router.push('/mood') },
@@ -111,11 +119,11 @@ export default function Home() {
             <BrandMark height={20} light />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
               <View>
-                <IconButton icon="chatbubble-ellipses-outline" label={chatUnread ? `Messages, ${chatUnread} new` : 'Messages'} color="#fff" onPress={() => router.push('/messages')} />
+                <IconButton icon="chatbubble-ellipses-outline" label={chatUnread ? `Messages, ${chatUnread} new` : 'Messages'} color={colors.heroText} onPress={() => router.push('/messages')} />
                 {chatUnread ? <View style={styles.unreadDot} importantForAccessibility="no" /> : null}
               </View>
               <View>
-                <IconButton icon="notifications-outline" label={notesUnread ? `Notifications, ${notesUnread} new` : 'Notifications'} color="#fff" onPress={() => router.push('/notifications')} />
+                <IconButton icon="notifications-outline" label={notesUnread ? `Notifications, ${notesUnread} new` : 'Notifications'} color={colors.heroText} onPress={() => router.push('/notifications')} />
                 {notesUnread ? <View style={styles.unreadDot} importantForAccessibility="no" /> : null}
               </View>
               <Pressable accessibilityRole="button" accessibilityLabel="Profile and settings" onPress={() => router.push('/more')} hitSlop={6}
@@ -159,13 +167,13 @@ export default function Home() {
         </Pressable>
       </View>
 
-      <Text variant="h2" accessibilityRole="header" style={{ marginBottom: space.md }}>How can we help you today?</Text>
+      <SectionHead title="How can we help you today?" />
       <View style={styles.grid}>
         {ACTIONS.map((a) => (
           <Pressable key={a.label} accessibilityRole="button" accessibilityLabel={`${a.label}. ${a.hint}`}
             onPress={() => router.push({ pathname: '/compose', params: { type: a.type, ...(a.category ? { category: a.category } : {}) } })}
             style={({ pressed }) => [styles.action, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]}>
-            <IconTile icon={a.icon} accent={a.accent} size={46} />
+            <IconTile icon={a.icon} accent={a.accent} size={42} />
             <View>
               <Text variant="h3" style={{ fontSize: 14, lineHeight: 18 }} numberOfLines={2}>{a.label}</Text>
               <Text variant="small" style={{ fontSize: 12, lineHeight: 16 }} numberOfLines={1}>{a.hint}</Text>
@@ -174,83 +182,85 @@ export default function Home() {
         ))}
       </View>
 
-      <Text variant="h2" accessibilityRole="header" style={{ marginBottom: space.md }}>Connect, recharge, grow</Text>
+      <Pressable onPress={() => router.push('/resource/r-eap')} accessibilityRole="button" accessibilityLabel="Need someone to talk to? See support options"
+        style={({ pressed }) => [styles.support, pressed && { opacity: 0.92 }]}>
+        <View style={styles.supportIcon}><Ionicons name="chatbubbles" size={22} color="#fff" /></View>
+        <View style={{ flex: 1 }}>
+          <Text variant="h3" style={{ color: colors.heroText }}>Need someone to talk to?</Text>
+          <Text variant="small" style={{ color: colors.heroMuted, marginTop: 2 }}>Confidential support through your Employee Assistance Program.</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.heroMuted} />
+      </Pressable>
+
+      <SectionHead title="Connect, recharge, grow" />
       <FeatureGrid items={[
         { label: 'Messages', hint: chatUnread ? `${chatUnread} new` : 'Private chats', icon: 'chatbubbles', accent: 'blue', href: '/messages', badge: chatUnread || undefined },
-        { label: 'People who understand', hint: 'Find a peer', icon: 'people-circle', accent: 'violet', href: '/people' },
-        { label: 'Meditate & breathe', hint: '1 to 10 minutes', icon: 'leaf', accent: 'green', href: '/meditate' },
+        { label: 'Find a peer', hint: 'People who understand', icon: 'people-circle', accent: 'violet', href: '/people' },
+        { label: 'Meditate', hint: '1 to 10 minutes', icon: 'leaf', accent: 'green', href: '/meditate' },
         { label: 'Micro-breaks', hint: 'Quick resets', icon: 'timer', accent: 'amber', href: '/microbreaks' },
-        { label: 'Recognition', hint: 'Shout-outs', icon: 'ribbon', accent: 'rose', href: '/recognition' },
+        { label: 'Shout-outs', hint: 'Recognition', icon: 'ribbon', accent: 'rose', href: '/recognition' },
         { label: 'Communities', hint: 'Follow what you like', icon: 'planet', accent: 'teal', href: '/communities' },
-        { label: 'My Journey', hint: 'Your progress', icon: 'footsteps', accent: 'slate', href: '/journey' },
-        { label: 'Feedback to ABB', hint: 'Anonymous', icon: 'megaphone', accent: 'blue', href: '/feedback' },
+        { label: 'My journey', hint: 'Your progress', icon: 'footsteps', accent: 'slate', href: '/journey' },
+        { label: 'Feedback', hint: 'Anonymous, to ABB', icon: 'megaphone', accent: 'blue', href: '/feedback' },
       ]} />
 
       {badges.data?.suggested.length ? (
         <>
-          <Text variant="h2" accessibilityRole="header" style={{ marginBottom: space.sm }}>Suggested for you</Text>
-          {badges.data.suggested.map((r) => (
-            <Row key={r.id} icon={GROUP_META[r.group].icon} accent={GROUP_META[r.group].accent} title={r.title} subtitle={r.subtitle}
-              onPress={() => router.push({ pathname: '/resource/[id]', params: { id: r.id } })} />
-          ))}
-          <View style={{ height: space.lg }} />
+          <SectionHead title="Suggested for you" action="All resources" onAction={() => router.push('/resources')} />
+          <RowGroup>
+            {badges.data.suggested.map((r) => (
+              <Row key={r.id} icon={GROUP_META[r.group].icon} accent={GROUP_META[r.group].accent} title={r.title} subtitle={r.subtitle}
+                onPress={() => router.push({ pathname: '/resource/[id]', params: { id: r.id } })} />
+            ))}
+          </RowGroup>
         </>
       ) : null}
 
-      <Card onPress={() => router.push('/resource/r-eap')} accessibilityLabel="Need someone to talk to? See support resources"
-        style={{ backgroundColor: colors.navy, borderColor: colors.navy, marginBottom: space.xs, flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-        <View style={{ flex: 1 }}>
-          <Text variant="h3" style={{ color: '#fff' }}>Need someone to talk to?</Text>
-          <Text variant="small" style={{ color: '#C9D1E2', marginTop: space.xs }}>
-            See the support options available through your Employee Assistance Program (EAP).
-          </Text>
-          <Text variant="h3" style={{ color: '#fff', marginTop: space.sm, fontSize: 14 }}>View support options →</Text>
-        </View>
-        <View style={[styles.eapIcon]}><Ionicons name="chatbubbles" size={26} color="#fff" /></View>
-      </Card>
-      <Notice text="This app is not monitored in real time. For urgent help, contact your local emergency services." icon="alert-circle-outline" tone="warn" />
-
-      <View style={styles.sectionHead}>
-        <Text variant="h2" accessibilityRole="header">Trending in Community</Text>
-        <Text variant="h3" style={{ color: colors.red }} accessibilityRole="link" onPress={() => router.push('/community')}>View all</Text>
-      </View>
-      {loading ? <Loading /> : !data?.trending.length ? <Text variant="small">No questions yet. Be the first to ask.</Text> : data.trending.map((p) => <PostCard key={p.id} post={p} meta={data.meta[p.id]} compact />)}
+      <SectionHead title="Trending in Community" action="View all" onAction={() => router.push('/community')} />
+      {loading ? <Loading /> : !data?.trending.length ? (
+        <Card><Text variant="small">No questions yet. Be the first to ask.</Text></Card>
+      ) : data.trending.map((p) => <PostCard key={p.id} post={p} meta={data.meta[p.id]} compact />)}
 
       {data?.achievement ? (
         <>
-          <Text variant="h2" accessibilityRole="header" style={{ marginTop: space.lg, marginBottom: space.md }}>Recognition</Text>
+          <SectionHead title="Recognition" action="See all" onAction={() => router.push({ pathname: '/community', params: { filter: 'achievements' } })} />
           <Card onPress={() => router.push({ pathname: '/community', params: { filter: 'achievements' } })} accessibilityLabel="Open achievements in Community">
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-              <IconTile icon="trophy" accent="amber" size={48} />
+              <IconTile icon="trophy" accent="amber" size={44} />
               <View style={{ flex: 1 }}>
-                <Text variant="h3">{data.achievement.title}</Text>
-                <Text variant="small">See achievements in Community</Text>
+                <Text variant="h3" numberOfLines={2}>{data.achievement.title}</Text>
+                <Text variant="small">Latest achievement shared</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.muted} />
             </View>
           </Card>
         </>
       ) : null}
+
+      <View style={{ marginTop: space.lg }}>
+        <Notice text="This app is not monitored in real time. For urgent help, contact your local emergency services." icon="alert-circle-outline" tone="warn" />
+      </View>
       </View>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   header: { marginTop: -space.lg, marginHorizontal: -space.lg, marginBottom: space.lg },
   body: { },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.lg },
-  unreadDot: { position: 'absolute', top: 6, right: 6, width: 10, height: 10, borderRadius: 5, backgroundColor: colors.red, borderWidth: 1.5, borderColor: colors.navy },
+  unreadDot: { position: 'absolute', top: 6, right: 6, width: 10, height: 10, borderRadius: 5, backgroundColor: colors.red, borderWidth: 1.5, borderColor: colors.hero },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: '#ffffff40' },
   search: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 52, paddingHorizontal: space.lg, borderRadius: radius.pill,
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginBottom: space.md, ...shadow },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: space.sm + 2, marginBottom: space.xl },
-  action: { width: '31.6%', minHeight: 132, padding: space.md, borderRadius: radius.xl, backgroundColor: colors.surface,
-    borderWidth: 1, borderColor: '#EEF0F5', justifyContent: 'space-between', ...shadow },
-  eapIcon: { width: 52, height: 52, borderRadius: 18, backgroundColor: accents.rose.fg, alignItems: 'center', justifyContent: 'center' },
-  statsRow: { flexDirection: 'row', gap: space.sm, marginBottom: space.xl },
-  stat: { flex: 1, padding: space.md, borderRadius: radius.xl, backgroundColor: colors.surface, borderWidth: 1, borderColor: '#EEF0F5', ...shadow },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: space.sm + 2, marginBottom: space.md },
+  action: { width: '31.6%', minHeight: 116, padding: space.md, borderRadius: radius.xl, backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: colors.line, justifyContent: 'space-between', ...shadow },
+  support: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.xl, backgroundColor: colors.hero, ...shadow },
+  supportIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' },
+  statsRow: { flexDirection: 'row', gap: space.sm, marginBottom: space.sm },
+  stat: { flex: 1, padding: space.md, borderRadius: radius.xl, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, ...shadow },
   statHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   statIcon: { marginTop: space.sm, height: 38, justifyContent: 'center' },
   statBig: { fontSize: 30, lineHeight: 38, marginTop: space.sm },
@@ -258,5 +268,5 @@ const styles = StyleSheet.create({
   dot: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.border },
   track: { height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden', marginTop: space.sm + 6 },
   fill: { height: 6, borderRadius: 3, backgroundColor: accents.amber.fg },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: space.lg, marginBottom: space.md },
-});
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: space.xl, marginBottom: space.md },
+}));

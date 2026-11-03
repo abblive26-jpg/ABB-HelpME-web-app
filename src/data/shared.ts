@@ -5,7 +5,12 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = { dailyReminder: fa
 /** Snapshot of what the author chose to show. Names are never included. */
 export function authorSnapshot(profile: Profile | null, show: boolean | undefined): AuthorMeta | null {
   if (!show || !profile) return null;
-  return { role: profile.role, experience: profile.experience, verified: profile.verified };
+  return { role: profile.role, experience: profile.experience, verified: profile.verified, username: profile.username };
+}
+
+/** The username is already taken (or is not allowed). */
+export class UsernameTakenError extends Error {
+  constructor() { super('That username is not available.'); this.name = 'UsernameTakenError'; }
 }
 
 export function validatePostInput(title: string, body: string, kind: PostKind): string | null {

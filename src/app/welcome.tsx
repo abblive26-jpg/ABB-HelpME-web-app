@@ -4,30 +4,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { confirmSignOut } from '@/components/accountActions';
 import { Capy, CapySays } from '@/components/Capy';
-import { OtpStep } from '@/components/OtpStep';
 import { InterestPicker } from '@/components/InterestPicker';
 import { SetPasswordForm } from '@/components/SetPasswordForm';
 import { UsernameField, type UsernameStatus } from '@/components/UsernameField';
 import { Select } from '@/components/Select';
 import { Badge, BrandMark, Button, Field, Text } from '@/components/ui';
 import { accents, colors, radius, shadow, space, themed } from '@/constants/brand';
-import { signInWithPassword, verifiedLabel, verifier } from '@/data/auth';
+import { signInWithPassword, verifiedLabel } from '@/data/auth';
 import { outfitForRole } from '@/lib/capy';
-import { ALLOWED_EMAIL_HINT, isAllowedEmail } from '@/lib/emailPolicy';
 import { SIGN_IN_FAILURE_TEXT } from '@/lib/password';
 import { UsernameTakenError } from '@/data/shared';
 import { usernameProblem } from '@/lib/username';
 import { EXPERIENCE_OPTIONS, ROLE_OPTIONS, roleLabel } from '@/lib/profileOptions';
-import { REQUEST_FAILURE_TEXT, VerificationError, isValidEmail, type OtpChallenge } from '@/lib/verification';
+import { isValidEmail } from '@/lib/verification';
 import { useApp } from '@/state/AppProvider';
 
 /**
- * landing → Login ID + password (employees, developer accounts) or email → code (emailed-code sign-in and registration) → details
- * (only for an account without a saved profile). A new account is first asked to choose its own password, whichever way it got in.
+ * landing → Login ID + password (every employee is issued their own) → details (only for an account without a saved profile).
+ * A new account is first asked to choose its own password. There is no self-registration and no emailed-code sign-in.
  */
-type Mode = 'landing' | 'email' | 'code' | 'details' | 'password';
-type Intent = 'register' | 'login';
-const STEP: Record<Exclude<Mode, 'landing'>, number> = { email: 1, code: 2, details: 3, password: 1 };
+type Mode = 'landing' | 'details' | 'password';
+const STEP: Record<Exclude<Mode, 'landing'>, number> = { password: 1, details: 2 };
 
 export default function Welcome() {
   const {
@@ -35,8 +32,6 @@ export default function Welcome() {
   } = useApp();
   // Signed in but no profile yet (e.g. the app was closed mid-registration): continue at the details step.
   const [mode, setMode] = useState<Mode>(() => (account && !profile ? 'details' : 'landing'));
-  const [intent, setIntent] = useState<Intent>('register');
-  const [challenge, setChallenge] = useState<OtpChallenge | null>(null);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [lock, setLock] = useState(true);
@@ -51,14 +46,12 @@ export default function Welcome() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const emailOk = isAllowedEmail(email);
   /** A new account must choose its own password before anything else, whichever way it signed in. */
   const forcePassword = signedIn && mustChangePassword;
 
   const goBack = useCallback(() => {
     setError(null);
-    if (mode === 'code') setMode('email');
-    else if (mode === 'details') { void signOut(); setMode('landing'); } // cancel registration
+    if (mode === 'details') { void signOut(); setMode('landing'); } // cancel registration
     else setMode('landing');
   }, [mode, signOut]);
 
@@ -68,32 +61,6 @@ export default function Welcome() {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => { goBack(); return true; });
     return () => sub.remove();
   }, [mode, goBack]);
-
-  const start = (i: Intent) => { setIntent(i); setError(null); setMissing(false); setMode('email'); };
-
-  const sendCode = async () => {
-    if (!emailOk) { setMissing(true); return; }
-    setBusy(true); setError(null);
-    try {
-      setChallenge(await verifier.requestCode(email, undefined, { createUser: intent === 'register' }));
-      setMode('code');
-    } catch (e) {
-      setError(REQUEST_FAILURE_TEXT[e instanceof VerificationError ? e.reason : 'send_failed']);
-    }
-    setBusy(false);
-  };
-
-  /** Code accepted: the session (JWT) exists now. */
-  const onVerified = async () => {
-    try {
-      const r = await finishSignIn();
-      if (r === 'needs_profile') setMode('details');
-      // 'ready': navigation moves on by itself.
-    } catch {
-      setError('Could not finish signing in. Please try again.');
-      setMode('email');
-    }
-  };
 
   /** Login ID + password. */
   const passwordSignIn = async () => {
@@ -144,10 +111,7 @@ export default function Welcome() {
     ? { pose: outfitForRole(role), text: `Nice to meet you${firstName ? `, ${firstName}` : ''}! ${role === 'other' ? '' : `A fellow ${roleLabel(role)}.`}`.trim() }
     : { pose: 'hi' as const, text: firstName ? `Hi ${firstName}! What do you do at ABB?` : "You're in! Tell me a little about your work." };
 
-  const steps = intent === 'register' || mode === 'details' ? 3 : 2;
-  const emailError = missing && !emailOk
-    ? (isValidEmail(email) ? REQUEST_FAILURE_TEXT.domain : 'Enter a valid email address.')
-    : error;
+  const steps = 2;
 
   if (forcePassword) {
     return (
@@ -185,36 +149,6 @@ export default function Welcome() {
                   : <Text variant="label" style={{ color: colors.red, letterSpacing: 1 }}>STEP {STEP[mode]} OF {steps}</Text>}
               </View>
 
-              {mode === 'email' ? (
-                <View>
-                  <CapySays pose="hi" message={intent === 'register' ? "Hi! I'm Cappy. Let's set you up." : 'Welcome back! Which email do you use?'}
-                    size={96} motion="pop" tint={colors.bg} />
-                  <Text variant="title" accessibilityRole="header" style={{ marginTop: space.xl, marginBottom: space.xs }}>
-                    {intent === 'register' ? 'Create your account' : 'Log in'}
-                  </Text>
-                  <Text variant="small" style={{ marginBottom: space.lg }}>
-                    We&apos;ll email you a 6-digit code. No password needed.
-                  </Text>
-                  <Field label="Email" value={email} onChangeText={(t) => { setEmail(t); setMissing(false); setError(null); }}
-                    placeholder="you@outlook.com or you@abb.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false}
-                    textContentType="emailAddress" autoComplete="email" returnKeyType="send" onSubmitEditing={sendCode}
-                    error={emailError} hint={`${ALLOWED_EMAIL_HINT} It's never shown on your posts.`} />
-                  <Button label="Send code" icon="mail-outline" onPress={sendCode} loading={busy} />
-                  <Text variant="small" style={{ textAlign: 'center', marginTop: space.lg }}>
-                    {intent === 'register' ? 'Already have an account? ' : 'New here? '}
-                    <Text variant="small" style={styles.link} accessibilityRole="button"
-                      onPress={() => start(intent === 'register' ? 'login' : 'register')}>
-                      {intent === 'register' ? 'Log in' : 'Create an account'}
-                    </Text>
-                  </Text>
-                </View>
-              ) : null}
-
-              {mode === 'code' && challenge ? (
-                <OtpStep email={email.trim()} challenge={challenge} createUser={intent === 'register'} onChallenge={setChallenge}
-                  onVerified={onVerified} onChangeEmail={() => { setMode('email'); setError(null); }} />
-              ) : null}
-
               {mode === 'password' ? (
                 <View>
                   <CapySays pose="hi" message="Welcome! Log in with the Login ID you were given." size={96} motion="pop" tint={colors.bg} />
@@ -231,11 +165,7 @@ export default function Welcome() {
                     onPress={() => setShowPassword((v) => !v)}>{showPassword ? 'Hide password' : 'Show password'}</Text>
                   <Button label="Log in" onPress={passwordSignIn} loading={busy} disabled={!email.trim() || !password} />
                   <Text variant="small" style={{ textAlign: 'center', marginTop: space.lg }}>
-                    Forgot your password?{' '}
-                    <Text variant="small" style={styles.link} accessibilityRole="button" onPress={() => start('login')}>Email me a sign-in code</Text>
-                  </Text>
-                  <Text variant="small" style={{ textAlign: 'center', marginTop: space.sm }}>
-                    No email access? Ask your administrator to reset your password.
+                    Forgot your password? Ask your administrator to reset it.
                   </Text>
                 </View>
               ) : null}
@@ -306,10 +236,6 @@ export default function Welcome() {
                 ) : (
                   <>
                     <Button label="Log in" onPress={() => { setError(null); setMode('password'); }} />
-                    <Text variant="small" style={{ textAlign: 'center' }}>
-                      New here?{' '}
-                      <Text variant="small" style={styles.link} accessibilityRole="button" onPress={() => start('register')}>Create an account</Text>
-                    </Text>
                   </>
                 )}
                 <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.sm }}>
